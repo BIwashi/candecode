@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BIwashi/candecode/pkg/can"
@@ -41,16 +43,23 @@ and writes the decoded messages to an MCAP file with protobuf schema.`,
 
 	cmd.Flags().StringVar(&s.dbcFile, "dbc-file", s.dbcFile, "DBC file")
 	cmd.Flags().StringVar(&s.pcapngFile, "pcapng-file", s.pcapngFile, "PCAPNG file")
-	cmd.Flags().StringVar(&s.mcapFile, "mcap-file", s.mcapFile, "MCAP file")
+	cmd.Flags().StringVar(&s.mcapFile, "mcap-file", s.mcapFile, "MCAP file (optional, defaults to PCAPNG filename with .mcap extension)")
 
 	cmd.MarkFlagRequired("dbc-file")
 	cmd.MarkFlagRequired("pcapng-file")
-	cmd.MarkFlagRequired("mcap-file")
 
 	return cmd
 }
 
 func (s *converter) run(ctx context.Context, input cli.Input) error {
+	// Generate MCAP filename from PCAPNG filename if not specified
+	if s.mcapFile == "" {
+		// Get base filename without extension
+		baseName := strings.TrimSuffix(filepath.Base(s.pcapngFile), filepath.Ext(s.pcapngFile))
+		// Save to mcap/ directory with .mcap extension
+		s.mcapFile = filepath.Join("mcap", baseName+".mcap")
+	}
+
 	input.Logger.Info("Starting PCAPNG to MCAP conversion",
 		"dbc_file", s.dbcFile,
 		"pcapng_file", s.pcapngFile,
@@ -81,6 +90,13 @@ func (s *converter) run(ctx context.Context, input cli.Input) error {
 
 	// Create MCAP file
 	input.Logger.Info("Creating MCAP file...")
+
+	// Create MCAP directory if it doesn't exist
+	mcapDir := filepath.Dir(s.mcapFile)
+	if err := os.MkdirAll(mcapDir, 0755); err != nil {
+		return fmt.Errorf("failed to create MCAP directory: %w", err)
+	}
+
 	mcapOutFile, err := os.Create(s.mcapFile)
 	if err != nil {
 		return fmt.Errorf("failed to create MCAP file: %w", err)
@@ -189,11 +205,11 @@ func (s *converter) run(ctx context.Context, input cli.Input) error {
 	if len(msgCounts) > 0 {
 		input.Logger.Info(fmt.Sprintf("Found %d unique message types", len(msgCounts)))
 		for msgID, count := range msgCounts {
-		if msg, ok := dbcData.GetMessage(msgID); ok {
-			input.Logger.Debug(fmt.Sprintf("  0x%03X (%s): %d messages", msgID, msg.Name, count))
-		} else {
-			input.Logger.Debug(fmt.Sprintf("  0x%03X: %d messages", msgID, count))
-		}
+			if msg, ok := dbcData.GetMessage(msgID); ok {
+				input.Logger.Debug(fmt.Sprintf("  0x%03X (%s): %d messages", msgID, msg.Name, count))
+			} else {
+				input.Logger.Debug(fmt.Sprintf("  0x%03X: %d messages", msgID, count))
+			}
 		}
 	}
 
