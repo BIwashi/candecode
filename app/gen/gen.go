@@ -2,7 +2,7 @@ package gen
 
 import (
 	"bytes"
-	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,18 +16,22 @@ import (
 type ProtoGenerator struct {
 	DBCFile     *dbc.DBCFile
 	PackageName string
+	logger      slog.Logger
 }
 
 // NewProtoGenerator creates a new ProtoGenerator
-func NewProtoGenerator(dbcFile *dbc.DBCFile, packageName string) *ProtoGenerator {
+func NewProtoGenerator(dbcFile *dbc.DBCFile, packageName string, logger slog.Logger) *ProtoGenerator {
 	return &ProtoGenerator{
 		DBCFile:     dbcFile,
 		PackageName: packageName,
+		logger:      logger,
 	}
 }
 
 // GenerateProto generates a Proto file from the DBC file
 func (g *ProtoGenerator) GenerateProto(templatePath, outputPath string) error {
+	g.logger.Info("Generating proto file", "template_path", templatePath, "output_path", outputPath)
+
 	// Read template file
 	tmplContent, err := os.ReadFile(templatePath)
 	if err != nil {
@@ -104,7 +108,7 @@ func GenerateProtoFilename(dbcFilename string) string {
 }
 
 // GenerateFromDBCFile is the main entry point for proto generation
-func GenerateFromDBCFile(dbcPath, templatePath, outputDir string) error {
+func GenerateFromDBCFile(dbcPath, templatePath, outputDir string, logger slog.Logger) error {
 	// Parse DBC file (using can-go adapter)
 	dbcFile, err := dbc.ParseFile(dbcPath)
 	if err != nil {
@@ -117,13 +121,13 @@ func GenerateFromDBCFile(dbcPath, templatePath, outputDir string) error {
 	outputPath := filepath.Join(outputDir, protoFilename)
 
 	// Create generator
-	generator := NewProtoGenerator(dbcFile, packageName)
+	generator := NewProtoGenerator(dbcFile, packageName, logger)
 
 	// Generate proto file
 	if err := generator.GenerateProto(templatePath, outputPath); err != nil {
 		return errors.Wrap(err, "failed to generate proto file")
 	}
 
-	fmt.Printf("Successfully generated proto file: %s\n", outputPath)
+	logger.Info("Successfully generated proto file", "output_path", outputPath)
 	return nil
 }

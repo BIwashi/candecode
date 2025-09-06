@@ -32,12 +32,14 @@ func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "convert",
 		Short: "Convert CAN data captured with pcapng to MCAP using a DBC file.",
-		Long: `Convert PCAPNG files captured from CAN bus to MCAP format.
-		
+		Long: `
+Convert PCAPNG files captured from CAN bus to MCAP format.
+
 This command reads CAN frames from a PCAPNG file, decodes them using a DBC file,
 and writes the decoded messages to an MCAP file with protobuf schema.`,
-		Example: `  # Convert PCAPNG to MCAP
-  candecode convert --dbc-file toyota.dbc --pcapng-file capture.pcapng --mcap-file output.mcap`,
+		Example: `
+# Convert PCAPNG to MCAP
+candecode convert --dbc-file toyota.dbc --pcapng-file capture.pcapng --mcap-file output.mcap`,
 		RunE: cli.WithContext(s.run),
 	}
 
@@ -45,8 +47,16 @@ and writes the decoded messages to an MCAP file with protobuf schema.`,
 	cmd.Flags().StringVar(&s.pcapngFile, "pcapng-file", s.pcapngFile, "PCAPNG file")
 	cmd.Flags().StringVar(&s.mcapFile, "mcap-file", s.mcapFile, "MCAP file (optional, defaults to PCAPNG filename with .mcap extension)")
 
-	cmd.MarkFlagRequired("dbc-file")
-	cmd.MarkFlagRequired("pcapng-file")
+	if err := cmd.MarkFlagRequired("dbc-file"); err != nil {
+		fmt.Printf("failed to mark flag as required, err: %v", err)
+
+		return nil
+	}
+	if err := cmd.MarkFlagRequired("pcapng-file"); err != nil {
+		fmt.Printf("failed to mark flag as required, err: %v", err)
+
+		return nil
+	}
 
 	return cmd
 }
@@ -80,7 +90,7 @@ func (s *converter) run(ctx context.Context, input cli.Input) error {
 	if err != nil {
 		return fmt.Errorf("failed to open PCAPNG file: %w", err)
 	}
-	defer pcapFile.Close()
+	defer func() { _ = pcapFile.Close() }()
 
 	// Create PCAPNG reader
 	reader, err := pcapng.NewReader(pcapFile)

@@ -2,6 +2,7 @@ package gen
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 
 	"github.com/BIwashi/candecode/pkg/cli"
@@ -32,7 +33,11 @@ func NewCommand() *cobra.Command {
 	cmd.Flags().StringVar(&s.protoFile, "proto-file", s.protoFile, "Output proto file path (optional, auto-generated if not specified)")
 	cmd.Flags().StringVar(&s.outputDir, "output-dir", s.outputDir, "Output directory for proto file")
 
-	cmd.MarkFlagRequired("dbc-file")
+	if err := cmd.MarkFlagRequired("dbc-file"); err != nil {
+		fmt.Printf("failed to mark flag as required, err: %v", err)
+
+		return nil
+	}
 
 	return cmd
 }
@@ -54,7 +59,7 @@ func (s *generator) run(ctx context.Context, input cli.Input) error {
 	)
 
 	// Generate proto file
-	if err := GenerateFromDBCFile(s.dbcFile, templatePath, s.outputDir); err != nil {
+	if err := GenerateFromDBCFile(s.dbcFile, templatePath, s.outputDir, input.Logger); err != nil {
 		return errors.Wrap(err, "failed to generate proto file")
 	}
 
