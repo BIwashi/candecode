@@ -55,12 +55,17 @@ dev/gen:
 
 .PHONY: dev/convert
 dev/convert: build ## Convert PCAPNG to MCAP ## make dev/convert PCAPNG=input.pcapng DBC=toyota.dbc
-dev/convert: PCAPNG ?= input.pcapng
+dev/convert: PCAPNG ?= pcapng/input.pcapng
 dev/convert: DBC ?= third_party/opendbc/opendbc/dbc/toyota_new_mc_pt_generated.dbc
-dev/convert: MCAP ?= mcap/output.mcap
+dev/convert: MCAP ?=
 dev/convert:
+ifdef MCAP
 	@echo "Converting PCAPNG to MCAP..."
 	@$(BIN_DIR)/candecode convert --pcapng-file $(PCAPNG) --dbc-file $(DBC) --mcap-file $(MCAP)
+else
+	@echo "Converting PCAPNG to MCAP..."
+	@$(BIN_DIR)/candecode convert --pcapng-file $(PCAPNG) --dbc-file $(DBC)
+endif
 
 ##### TEST #####
 
