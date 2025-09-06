@@ -85,12 +85,12 @@ func GeneratePackageName(dbcFilename string) string {
 	// Get base name without extension
 	baseName := filepath.Base(dbcFilename)
 	baseName = strings.TrimSuffix(baseName, filepath.Ext(baseName))
-	
+
 	// Convert to valid package name (lowercase, replace invalid chars with underscore)
 	packageName := strings.ToLower(baseName)
 	packageName = strings.ReplaceAll(packageName, "-", "_")
 	packageName = strings.ReplaceAll(packageName, " ", "_")
-	
+
 	return packageName
 }
 
@@ -99,14 +99,14 @@ func GenerateProtoFilename(dbcFilename string) string {
 	// Get base name without extension
 	baseName := filepath.Base(dbcFilename)
 	baseName = strings.TrimSuffix(baseName, filepath.Ext(baseName))
-	
+
 	return baseName + ".proto"
 }
 
 // GenerateFromDBCFile is the main entry point for proto generation
 func GenerateFromDBCFile(dbcPath, templatePath, outputDir string) error {
- // Parse DBC file (using can-go adapter)
- dbcFile, err := dbc.ParseFile(dbcPath)
+	// Parse DBC file (using can-go adapter)
+	dbcFile, err := dbc.ParseFile(dbcPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse DBC file")
 	}

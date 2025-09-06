@@ -40,13 +40,13 @@ func NewCommand() *cobra.Command {
 func (s *generator) run(ctx context.Context, input cli.Input) error {
 	// Use default template path
 	templatePath := "template/dbc_to_proto.tmpl"
-	
+
 	// If proto file is not specified, it will be auto-generated
 	if s.protoFile != "" {
 		// Use specified proto file path
 		s.outputDir = filepath.Dir(s.protoFile)
 	}
-	
+
 	input.Logger.Info("Generating proto file from DBC",
 		"dbc_file", s.dbcFile,
 		"output_dir", s.outputDir,

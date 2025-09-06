@@ -1,52 +1,52 @@
 package dbc
 
 import (
-"bufio"
-"os"
-"regexp"
-"strconv"
-"strings"
+	"bufio"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
 
-cdbc "go.einride.tech/can/pkg/dbc"
-"github.com/cockroachdb/errors"
+	"github.com/cockroachdb/errors"
+	cdbc "go.einride.tech/can/pkg/dbc"
 )
 
 // Message represents a CAN message from DBC file
 type Message struct {
-ID       uint32
-Name     string
-Size     int
-Signals  []Signal
-SendNode string
-CanGoDef *cdbc.MessageDef // populated when parsed via can-go adapter
+	ID       uint32
+	Name     string
+	Size     int
+	Signals  []Signal
+	SendNode string
+	CanGoDef *cdbc.MessageDef // populated when parsed via can-go adapter
 }
 
 // Signal represents a signal within a CAN message
 type Signal struct {
-	Name       string
-	StartBit   int
-	BitLength  int
-	ByteOrder  int // 0 = Motorola (big-endian), 1 = Intel (little-endian)
-	IsSigned   bool
-	Scale      float64
-	Offset     float64
-	Min        float64
-	Max        float64
-	Unit       string
-	Receivers  []string
+	Name      string
+	StartBit  int
+	BitLength int
+	ByteOrder int // 0 = Motorola (big-endian), 1 = Intel (little-endian)
+	IsSigned  bool
+	Scale     float64
+	Offset    float64
+	Min       float64
+	Max       float64
+	Unit      string
+	Receivers []string
 }
 
 // DBCFile represents a parsed DBC file
 type DBCFile struct {
-Messages  map[uint32]*Message // Map of message ID to Message
-Version   string
-CanGoFile *cdbc.File // reference to original can-go parsed file (nil if legacy parser used)
+	Messages  map[uint32]*Message // Map of message ID to Message
+	Version   string
+	CanGoFile *cdbc.File // reference to original can-go parsed file (nil if legacy parser used)
 }
 
- // ParseDBCFile parses a DBC file and returns a DBCFile structure.
- // DEPRECATED: Prefer using ParseFile (adapter over go.einride.tech/can) for all new code.
- // This legacy parser is kept temporarily for reference and will be removed once all
- // callers have migrated to ParseFile.
+// ParseDBCFile parses a DBC file and returns a DBCFile structure.
+// DEPRECATED: Prefer using ParseFile (adapter over go.einride.tech/can) for all new code.
+// This legacy parser is kept temporarily for reference and will be removed once all
+// callers have migrated to ParseFile.
 func ParseDBCFile(filename string) (*DBCFile, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -84,7 +84,7 @@ func ParseDBCFile(filename string) (*DBCFile, error) {
 		if matches := messageRegex.FindStringSubmatch(line); matches != nil {
 			id, _ := strconv.ParseUint(matches[1], 10, 32)
 			size, _ := strconv.Atoi(matches[3])
-			
+
 			currentMessage = &Message{
 				ID:       uint32(id),
 				Name:     matches[2],
@@ -104,7 +104,7 @@ func ParseDBCFile(filename string) (*DBCFile, error) {
 			isSigned := matches[5] == "-"
 			scale, _ := strconv.ParseFloat(matches[6], 64)
 			offset, _ := strconv.ParseFloat(matches[7], 64)
-			
+
 			// Parse min/max range
 			var min, max float64
 			if matches[8] != "" {
@@ -116,7 +116,7 @@ func ParseDBCFile(filename string) (*DBCFile, error) {
 			}
 
 			receivers := strings.Fields(matches[10])
-			
+
 			signal := Signal{
 				Name:      matches[1],
 				StartBit:  startBit,
@@ -130,7 +130,7 @@ func ParseDBCFile(filename string) (*DBCFile, error) {
 				Unit:      matches[9],
 				Receivers: receivers,
 			}
-			
+
 			currentMessage.Signals = append(currentMessage.Signals, signal)
 		}
 	}
@@ -163,12 +163,12 @@ func ToProtoFieldName(signalName string) string {
 	// Convert to lowercase and replace invalid characters with underscore
 	name := strings.ToLower(signalName)
 	name = regexp.MustCompile(`[^a-z0-9_]+`).ReplaceAllString(name, "_")
-	
+
 	// Ensure it doesn't start with a number
 	if matched, _ := regexp.MatchString(`^\d`, name); matched {
 		name = "_" + name
 	}
-	
+
 	return name
 }
 
@@ -178,11 +178,11 @@ func ToProtoMessageName(messageName string) string {
 	parts := strings.FieldsFunc(messageName, func(r rune) bool {
 		return r == '_' || r == '-' || r == ' '
 	})
-	
+
 	for i, part := range parts {
 		parts[i] = strings.Title(strings.ToLower(part))
 	}
-	
+
 	return strings.Join(parts, "")
 }
 
@@ -192,7 +192,7 @@ func (s *Signal) GetProtoType() string {
 	if s.Scale != 0 && s.Scale != 1 {
 		return "double"
 	}
-	
+
 	// For integer values
 	if s.IsSigned {
 		if s.BitLength <= 32 {
@@ -200,7 +200,7 @@ func (s *Signal) GetProtoType() string {
 		}
 		return "int64"
 	}
-	
+
 	if s.BitLength <= 32 {
 		return "uint32"
 	}

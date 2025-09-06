@@ -26,11 +26,11 @@ func ParseFile(filename string) (*DBCFile, error) {
 
 	file := parser.File()
 
-out := &DBCFile{
-Version:   "",
-Messages:  make(map[uint32]*Message),
-CanGoFile: file,
-}
+	out := &DBCFile{
+		Version:   "",
+		Messages:  make(map[uint32]*Message),
+		CanGoFile: file,
+	}
 
 	for _, def := range file.Defs {
 		switch m := def.(type) {
@@ -42,14 +42,14 @@ CanGoFile: file,
 				msgID = uint32(uint64(m.MessageID) & 0x1FFFFFFF)
 			}
 
-newMsg := &Message{
-ID:       msgID,
-Name:     string(m.Name),
-Size:     int(m.Size),
-SendNode: string(m.Transmitter),
-Signals:  []Signal{},
-CanGoDef: m,
-}
+			newMsg := &Message{
+				ID:       msgID,
+				Name:     string(m.Name),
+				Size:     int(m.Size),
+				SendNode: string(m.Transmitter),
+				Signals:  []Signal{},
+				CanGoDef: m,
+			}
 
 			for _, s := range m.Signals {
 				receivers := make([]string, 0, len(s.Receivers))

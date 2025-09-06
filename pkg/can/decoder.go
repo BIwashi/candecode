@@ -1,12 +1,12 @@
 package can
 
 import (
-"fmt"
-"math"
+	"fmt"
+	"math"
 
-"github.com/BIwashi/candecode/pkg/dbc"
-"github.com/BIwashi/candecode/pkg/pcapng"
-"github.com/cockroachdb/errors"
+	"github.com/BIwashi/candecode/pkg/dbc"
+	"github.com/BIwashi/candecode/pkg/pcapng"
+	"github.com/cockroachdb/errors"
 )
 
 // DecodedMessage represents a decoded CAN message with all signal values
@@ -25,7 +25,6 @@ type SignalValue struct {
 	PhysicalValue float64
 	Unit          string
 }
-
 
 // Decoder decodes CAN frames using DBC information
 type Decoder struct {
@@ -133,12 +132,12 @@ func extractIntelSignal(data []byte, startBit, bitLength int) uint64 {
 // extractMotorolaSignal extracts a signal value in Motorola byte order (big-endian)
 func extractMotorolaSignal(data []byte, startBit, bitLength int) uint64 {
 	var result uint64
-	
+
 	// For Motorola byte order, calculate the actual start position
 	// Start bit is given as the MSB position
 	msb := startBit
 	lsb := msb - bitLength + 1
-	
+
 	// Handle negative LSB (spans across byte boundaries)
 	if lsb < 0 {
 		// Signal spans multiple bytes
@@ -147,14 +146,14 @@ func extractMotorolaSignal(data []byte, startBit, bitLength int) uint64 {
 			if bitPos < 0 {
 				continue
 			}
-			
+
 			byteIndex := bitPos / 8
 			bitIndex := 7 - (bitPos % 8) // Motorola uses MSB first
-			
+
 			if byteIndex >= len(data) {
 				continue
 			}
-			
+
 			// Extract bit from data
 			bit := (data[byteIndex] >> bitIndex) & 1
 			if bit == 1 {
@@ -165,19 +164,19 @@ func extractMotorolaSignal(data []byte, startBit, bitLength int) uint64 {
 		// Signal within byte boundaries
 		startByte := msb / 8
 		endByte := lsb / 8
-		
+
 		// Extract bits
 		for byteIdx := startByte; byteIdx >= endByte && byteIdx >= 0; byteIdx-- {
 			if byteIdx >= len(data) {
 				continue
 			}
-			
+
 			for bitIdx := 7; bitIdx >= 0; bitIdx-- {
 				bitPos := byteIdx*8 + (7 - bitIdx)
 				if bitPos > msb || bitPos < lsb {
 					continue
 				}
-				
+
 				bit := (data[byteIdx] >> bitIdx) & 1
 				if bit == 1 {
 					shiftAmount := bitPos - lsb
@@ -186,14 +185,14 @@ func extractMotorolaSignal(data []byte, startBit, bitLength int) uint64 {
 			}
 		}
 	}
-	
+
 	return result
 }
 
 // ApplyScaleOffset applies scale and offset to convert raw value to physical value
 func ApplyScaleOffset(rawValue uint64, scale, offset float64, isSigned bool, bitLength int) float64 {
 	var value float64
-	
+
 	if isSigned {
 		// Convert to signed integer
 		signBit := uint64(1) << (bitLength - 1)
@@ -208,7 +207,7 @@ func ApplyScaleOffset(rawValue uint64, scale, offset float64, isSigned bool, bit
 	} else {
 		value = float64(rawValue)
 	}
-	
+
 	return value*scale + offset
 }
 
@@ -218,7 +217,7 @@ func ValidatePhysicalValue(value, min, max float64) bool {
 	if min == 0 && max == 0 {
 		return true
 	}
-	
+
 	// Allow for some floating point tolerance
 	const epsilon = 1e-9
 	return value >= (min-epsilon) && value <= (max+epsilon)
@@ -229,7 +228,7 @@ func FormatSignalValue(value float64, unit string) string {
 	// Format based on value magnitude
 	formatted := ""
 	absValue := math.Abs(value)
-	
+
 	if absValue == 0 {
 		formatted = "0"
 	} else if absValue >= 1000 || absValue < 0.01 {
@@ -241,7 +240,7 @@ func FormatSignalValue(value float64, unit string) string {
 	} else {
 		formatted = fmt.Sprintf("%.3f", value)
 	}
-	
+
 	if unit != "" {
 		return fmt.Sprintf("%s %s", formatted, unit)
 	}

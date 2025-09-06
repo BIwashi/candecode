@@ -39,7 +39,7 @@ func NewReader(r io.Reader) (*Reader, error) {
 
 	// Get link type from the first interface
 	linkType := ngReader.LinkType()
-	
+
 	return &Reader{
 		reader:   ngReader,
 		linkType: linkType,
@@ -92,7 +92,7 @@ func (r *Reader) extractCANFrame(packet gopacket.Packet, ci gopacket.CaptureInfo
 func (r *Reader) extractSocketCANFrame(packet gopacket.Packet, ci gopacket.CaptureInfo) (*CANFrame, error) {
 	// Get the raw packet data after the Linux SLL header
 	var payload []byte
-	
+
 	// Check for Linux SLL layer
 	if sllLayer := packet.Layer(layers.LayerTypeLinuxSLL); sllLayer != nil {
 		sll := sllLayer.(*layers.LinuxSLL)
@@ -107,19 +107,19 @@ func (r *Reader) extractSocketCANFrame(packet gopacket.Packet, ci gopacket.Captu
 	// 1 byte: Data length
 	// 3 bytes: Padding
 	// 8 bytes: Data (max)
-	
+
 	if len(payload) < 8 {
 		return nil, fmt.Errorf("payload too short for CAN frame")
 	}
 
 	// Parse CAN ID and flags
 	canIDRaw := binary.LittleEndian.Uint32(payload[0:4])
-	
+
 	// Extract flags from CAN ID
 	isExtended := (canIDRaw & 0x80000000) != 0
 	isRemote := (canIDRaw & 0x40000000) != 0
 	isError := (canIDRaw & 0x20000000) != 0
-	
+
 	// Extract actual CAN ID
 	var canID uint32
 	if isExtended {
@@ -160,12 +160,12 @@ func (r *Reader) extractRawCANFrame(data []byte, ci gopacket.CaptureInfo) (*CANF
 
 	// Parse CAN ID and flags
 	canIDRaw := binary.LittleEndian.Uint32(data[0:4])
-	
+
 	// Extract flags from CAN ID
 	isExtended := (canIDRaw & 0x80000000) != 0
 	isRemote := (canIDRaw & 0x40000000) != 0
 	isError := (canIDRaw & 0x20000000) != 0
-	
+
 	// Extract actual CAN ID
 	var canID uint32
 	if isExtended {
@@ -199,10 +199,10 @@ func (r *Reader) extractRawCANFrame(data []byte, ci gopacket.CaptureInfo) (*CANF
 
 // GetPacketCount returns the number of packets read
 func (r *Reader) GetPacketCount() uint64 {
-return r.packetCount
+	return r.packetCount
 }
 
 // ReadFrame provides backward-compatible name expected by converter code.
 func (r *Reader) ReadFrame() (*CANFrame, error) {
-return r.ReadNext()
+	return r.ReadNext()
 }

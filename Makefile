@@ -20,7 +20,15 @@ setup: ## Setup environment ## make setup
 	uv sync
 	go mod tidy
 
+##### LINT #####
+
+.PHONY: lint
+lint/: ## Run all lint ## make lint/all
+	@echo "Running all lint..."
+	go fmt ./...
+
 ##### BUILD #####
+
 .PHONY: build/opendbc
 build/opendbc: setup
 build/opendbc: ## Build opendbc files ## make build/opendbc

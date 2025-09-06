@@ -1,18 +1,18 @@
 package mcap
 
 import (
-"bytes"
-"encoding/binary"
-"fmt"
-"io"
-"math"
-"time"
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
+	"math"
+	"time"
 
-"github.com/BIwashi/candecode/pkg/can"
-"github.com/BIwashi/candecode/pkg/dbc"
-"github.com/foxglove/mcap/go/mcap"
-"google.golang.org/protobuf/proto"
-"google.golang.org/protobuf/types/descriptorpb"
+	"github.com/BIwashi/candecode/pkg/can"
+	"github.com/BIwashi/candecode/pkg/dbc"
+	"github.com/foxglove/mcap/go/mcap"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 // Writer writes decoded CAN messages to MCAP format
@@ -36,11 +36,11 @@ func NewWriter(w io.Writer, dbcFile *dbc.DBCFile, protoSchema []byte) (*Writer, 
 		return nil, fmt.Errorf("failed to create MCAP writer: %w", err)
 	}
 
- // Write header (no ROS2 profile – using generic candecode proto schema)
- err = writer.WriteHeader(&mcap.Header{
- Profile: "",
- Library: "candecode",
- })
+	// Write header (no ROS2 profile – using generic candecode proto schema)
+	err = writer.WriteHeader(&mcap.Header{
+		Profile: "",
+		Library: "candecode",
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to write header: %w", err)
 	}
@@ -70,7 +70,7 @@ func (w *Writer) registerSchemasAndChannels() error {
 		w.nextID++
 
 		schemaName := fmt.Sprintf("candecode.%s", dbc.ToProtoMessageName(msg.Name))
-		
+
 		// Build schema data (proto descriptor)
 		schemaData, err := w.buildProtoSchemaForMessage(msg)
 		if err != nil {
@@ -116,11 +116,11 @@ func (w *Writer) registerSchemasAndChannels() error {
 // buildProtoSchemaForMessage builds proto schema data for a specific message
 func (w *Writer) buildProtoSchemaForMessage(msg *dbc.Message) ([]byte, error) {
 	// Create a FileDescriptorProto for this message
-fd := &descriptorpb.FileDescriptorProto{
-Name:    proto.String(fmt.Sprintf("%s.proto", dbc.ToProtoMessageName(msg.Name))),
-Package: proto.String("candecode"),
-Syntax:  proto.String("proto3"),
-}
+	fd := &descriptorpb.FileDescriptorProto{
+		Name:    proto.String(fmt.Sprintf("%s.proto", dbc.ToProtoMessageName(msg.Name))),
+		Package: proto.String("candecode"),
+		Syntax:  proto.String("proto3"),
+	}
 
 	// Create message descriptor
 	msgDesc := &descriptorpb.DescriptorProto{
@@ -216,29 +216,29 @@ func (w *Writer) buildProtoMessageData(msg *can.DecodedMessage, timestamp time.T
 	enc := &protoEncoder{w: &buf}
 
 	// Write can_id (field 1)
-enc.writeUint32(1, msg.MessageID)
+	enc.writeUint32(1, msg.MessageID)
 
-// Write raw_data (field 2)
-enc.writeBytes(2, msg.RawData)
+	// Write raw_data (field 2)
+	enc.writeBytes(2, msg.RawData)
 
-// Write timestamp_ns (field 3)
-enc.writeUint64(3, uint64(timestamp.UnixNano()))
+	// Write timestamp_ns (field 3)
+	enc.writeUint64(3, uint64(timestamp.UnixNano()))
 
-// Write signal values in deterministic DBC order to match schema numbering.
-fieldNum := uint32(4)
-dbcMsg, ok := w.dbcFile.Messages[msg.MessageID]
-if ok {
-for _, sig := range dbcMsg.Signals {
-if val, found := msg.Signals[sig.Name]; found {
-enc.writeDouble(fieldNum, val.PhysicalValue)
-}
-fieldNum++
-if val, found := msg.Signals[sig.Name]; found {
-enc.writeInt64(fieldNum, int64(val.RawValue))
-}
-fieldNum++
-}
-}
+	// Write signal values in deterministic DBC order to match schema numbering.
+	fieldNum := uint32(4)
+	dbcMsg, ok := w.dbcFile.Messages[msg.MessageID]
+	if ok {
+		for _, sig := range dbcMsg.Signals {
+			if val, found := msg.Signals[sig.Name]; found {
+				enc.writeDouble(fieldNum, val.PhysicalValue)
+			}
+			fieldNum++
+			if val, found := msg.Signals[sig.Name]; found {
+				enc.writeInt64(fieldNum, int64(val.RawValue))
+			}
+			fieldNum++
+		}
+	}
 
 	return buf.Bytes(), nil
 }
