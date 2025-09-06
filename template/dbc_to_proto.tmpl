@@ -1,0 +1,20 @@
+syntax = "proto3";
+package {{.PackageName}};
+option go_package = "github.com/BIwashi/candecode/generated/proto/{{.PackageName}}";
+{{- range $msgID, $msg := .Messages}}
+message {{ToProtoMessageName $msg.Name}} { // {{$msg.Name}} (CAN ID {{$msgID}})
+  uint32 can_id = 1;        // CAN Message ID: {{$msgID}}
+  bytes  raw_data = 2;      // Raw CAN data ({{$msg.Size}} bytes)
+  uint64 timestamp_ns = 3;  // Timestamp in nanoseconds
+  {{$fieldNum := 4 -}}
+  {{- range $signal := $msg.Signals}}
+  {{GetProtoType $signal}} {{ToProtoFieldName $signal.Name}} = {{$fieldNum}}; // {{if $signal.Unit}}[{{$signal.Unit}}]{{end}} scale={{$signal.Scale}} offset={{$signal.Offset}}
+  {{$fieldNum = add $fieldNum 1 -}}
+  {{- end}}
+  // raw values
+  {{- range $signal := $msg.Signals}}
+  {{if $signal.IsSigned}}int32{{else}}uint32{{end}} {{ToProtoFieldName $signal.Name}}_raw = {{$fieldNum}};
+  {{$fieldNum = add $fieldNum 1 -}}
+  {{- end}}
+}
+{{- end}}
