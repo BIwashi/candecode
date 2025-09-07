@@ -125,12 +125,14 @@ func (s *converter) run(ctx context.Context, input cli.Input) error {
 
 	// Process frames
 	input.Logger.Info("Converting CAN frames...")
-	frameCount := 0
-	messageCount := 0
-	skippedCount := 0
-	outOfRangeCount := 0
-	startTime := time.Now()
-	msgCounts := make(map[uint32]int)
+	var (
+		frameCount      = 0
+		messageCount    = 0
+		skippedCount    = 0
+		outOfRangeCount = 0
+		startTime       = time.Now()
+		msgCounts       = make(map[uint32]int)
+	)
 
 	for {
 		// Check context cancellation
@@ -183,8 +185,7 @@ func (s *converter) run(ctx context.Context, input cli.Input) error {
 			}
 		}
 
-		err = writer.WriteMessage(decodedMsg, timestamp)
-		if err != nil {
+		if err := writer.WriteMessage(decodedMsg, timestamp); err != nil {
 			return fmt.Errorf("failed to write message: %w", err)
 		}
 
