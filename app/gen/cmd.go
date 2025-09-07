@@ -14,6 +14,7 @@ type generator struct {
 	dbcFile   string
 	protoFile string
 	outputDir string
+	bufPath   string
 }
 
 func NewCommand() *cobra.Command {
@@ -21,6 +22,7 @@ func NewCommand() *cobra.Command {
 		dbcFile:   "",
 		protoFile: "",
 		outputDir: "generated/proto/v1",
+		bufPath:   "./bin/buf",
 	}
 
 	cmd := &cobra.Command{
@@ -32,6 +34,7 @@ func NewCommand() *cobra.Command {
 	cmd.Flags().StringVar(&s.dbcFile, "dbc-file", s.dbcFile, "DBC file path")
 	cmd.Flags().StringVar(&s.protoFile, "proto-file", s.protoFile, "Output proto file path (optional, auto-generated if not specified)")
 	cmd.Flags().StringVar(&s.outputDir, "output-dir", s.outputDir, "Output directory for proto file")
+	cmd.Flags().StringVar(&s.bufPath, "buf-path", s.bufPath, "Buf binary path")
 
 	if err := cmd.MarkFlagRequired("dbc-file"); err != nil {
 		fmt.Printf("failed to mark flag as required, err: %v", err)
@@ -58,7 +61,7 @@ func (s *generator) run(ctx context.Context, input cli.Input) error {
 		"template", templatePath,
 	)
 
-	if err := GenerateFromDBCFile(s.dbcFile, templatePath, s.outputDir, input.Logger); err != nil {
+	if err := GenerateFromDBCFile(s.dbcFile, templatePath, s.outputDir, s.bufPath, input.Logger); err != nil {
 		return errors.Wrap(err, "failed to generate proto file")
 	}
 

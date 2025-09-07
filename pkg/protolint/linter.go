@@ -1,9 +1,9 @@
 package protolint
 
 import (
-	"bytes"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -12,13 +12,15 @@ import (
 
 // Linter provides proto file linting functionality
 type Linter struct {
-	logger slog.Logger
+	bufPath string
+	logger  slog.Logger
 }
 
 // NewLinter creates a new Linter instance
-func NewLinter(logger slog.Logger) *Linter {
+func NewLinter(bufPath string, logger slog.Logger) *Linter {
 	return &Linter{
-		logger: logger,
+		bufPath: bufPath,
+		logger:  logger,
 	}
 }
 
@@ -31,15 +33,15 @@ type LintResult struct {
 
 // LintWithBuf runs buf lint on the specified proto file or directory
 func (l *Linter) LintWithBuf(path string) (*LintResult, error) {
-	l.logger.Info("Running buf lint", "path", path)
+	l.logger.Info("Running buf lint", "path", path, "buf_path", l.bufPath)
 
-	// Check if buf is installed
-	if err := l.checkBufInstalled(); err != nil {
-		return nil, errors.Wrap(err, "buf is not installed")
+	// Check if buf binary exists
+	if err := l.checkBufExists(); err != nil {
+		return nil, errors.Wrap(err, "buf binary not found")
 	}
 
 	// Run buf lint
-	cmd := exec.Command("buf", "lint", path)
+	cmd := exec.Command(l.bufPath, "lint", path)
 	output, err := cmd.CombinedOutput()
 
 	result := &LintResult{
@@ -86,72 +88,10 @@ func (l *Linter) LintWithBuf(path string) (*LintResult, error) {
 	return result, nil
 }
 
-// LintWithProtolint runs protolint on the specified proto file
-func (l *Linter) LintWithProtolint(path string) (*LintResult, error) {
-	l.logger.Info("Running protolint", "path", path)
-
-	// Check if protolint is installed
-	if err := l.checkProtolintInstalled(); err != nil {
-		return nil, errors.Wrap(err, "protolint is not installed")
-	}
-
-	// Run protolint
-	cmd := exec.Command("protolint", "lint", path)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-
-	result := &LintResult{
-		Success:  err == nil,
-		Messages: []string{},
-		Errors:   []string{},
-	}
-
-	// Parse output
-	if stdout.Len() > 0 {
-		output := strings.TrimSpace(stdout.String())
-		if output != "" {
-			result.Errors = strings.Split(output, "\n")
-		}
-	}
-
-	if stderr.Len() > 0 {
-		errOutput := strings.TrimSpace(stderr.String())
-		if errOutput != "" {
-			result.Errors = append(result.Errors, strings.Split(errOutput, "\n")...)
-		}
-	}
-
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
-			l.logger.Warn("Proto file has lint warnings (protolint)", "warnings", len(result.Errors))
-		} else {
-			return result, errors.Wrap(err, "failed to run protolint")
-		}
-	} else {
-		l.logger.Info("Proto file passed protolint check")
-		result.Messages = append(result.Messages, "Proto file passed all protolint checks")
-	}
-
-	return result, nil
-}
-
-// checkBufInstalled checks if buf is installed
-func (l *Linter) checkBufInstalled() error {
-	cmd := exec.Command("buf", "--version")
-	if err := cmd.Run(); err != nil {
-		return errors.New("buf is not installed. Please install it from https://docs.buf.build/installation")
-	}
-	return nil
-}
-
-// checkProtolintInstalled checks if protolint is installed
-func (l *Linter) checkProtolintInstalled() error {
-	cmd := exec.Command("protolint", "--version")
-	if err := cmd.Run(); err != nil {
-		return errors.New("protolint is not installed. Please install it from https://github.com/yoheimuta/protolint")
+// checkBufExists checks if buf binary exists
+func (l *Linter) checkBufExists() error {
+	if _, err := os.Stat(l.bufPath); os.IsNotExist(err) {
+		return errors.Errorf("buf binary not found at %s", l.bufPath)
 	}
 	return nil
 }
@@ -177,10 +117,15 @@ func (r *LintResult) FormatResult() string {
 
 // Format formats a proto file using buf format
 func (l *Linter) Format(path string) error {
-	l.logger.Info("Formatting proto file with buf", "path", path)
+	l.logger.Info("Formatting proto file with buf", "path", path, "buf_path", l.bufPath)
+
+	// Check if buf binary exists
+	if err := l.checkBufExists(); err != nil {
+		return errors.Wrap(err, "buf binary not found")
+	}
 
 	// Run buf format with -w flag to write changes
-	cmd := exec.Command("buf", "format", "-w", path)
+	cmd := exec.Command(l.bufPath, "format", "-w", path)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {

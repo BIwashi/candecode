@@ -1,8 +1,16 @@
 .DEFAULT_GOAL := help
 
-OS   	:= $(shell uname | awk '{print tolower($$0)}')
-ARCH 	:= $(shell case $$(uname -m) in (x86_64) echo amd64 ;; (aarch64) echo arm64 ;; (*) echo $$(uname -m) ;; esac)
-BIN_DIR	:= ./bin
+OS   		:= $(shell uname | awk '{print tolower($$0)}')
+ARCH 		:= $(shell case $$(uname -m) in (x86_64) echo amd64 ;; (aarch64) echo arm64 ;; (*) echo $$(uname -m) ;; esac)
+BIN_DIR		:= ./bin
+BUF_VERSION	:= 1.32.2
+BUF			:= $(abspath $(BIN_DIR)/buf)
+PROTOLINT_VERSION := 0.55.0
+
+##### BINARY #####
+buf: $(BUF)
+$(BUF):
+	@curl -sSL "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-$(shell uname -s)-$(shell uname -m)" -o $(BUF) && chmod +x $(BUF)
 
 ##### SYNC #####
 
@@ -55,11 +63,9 @@ build: build/cmd ## Build all components ## make build
 .PHONY: dev/gen
 dev/gen: build ## Generate proto from DBC ## make dev/gen DBC=third_party/opendbc/opendbc/dbc/toyota_new_mc_pt_generated.dbc
 dev/gen: DBC ?= third_party/opendbc/opendbc/dbc/toyota_new_mc_pt_generated.dbc
-dev/gen: OUTPUT ?= generated/
-dev/gen:
+dev/gen: $(BUF)
 	@echo "Generating proto from DBC file..."
-	@mkdir -p $(OUTPUT)
-	@$(BIN_DIR)/candecode gen --dbc-file $(DBC) --output-dir $(OUTPUT)
+	@$(BIN_DIR)/candecode gen --dbc-file $(DBC)
 
 .PHONY: dev/convert
 dev/convert: build ## Convert PCAPNG to MCAP ## make dev/convert PCAPNG=input.pcapng DBC=toyota.dbc

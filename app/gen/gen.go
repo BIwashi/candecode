@@ -30,7 +30,7 @@ func NewProtoGenerator(dbcFile *dbc.DBCFile, packageName string, logger slog.Log
 }
 
 // GenerateProto generates a Proto file from the DBC file
-func (g *ProtoGenerator) GenerateProto(templatePath, outputPath string) error {
+func (g *ProtoGenerator) GenerateProto(templatePath, outputPath string, bufPath string) error {
 	g.logger.Info("Generating proto file", "template_path", templatePath, "output_path", outputPath)
 
 	// Read template file
@@ -82,7 +82,7 @@ func (g *ProtoGenerator) GenerateProto(templatePath, outputPath string) error {
 		return errors.Wrap(err, "failed to write proto file")
 	}
 
-	if err := g.LintProtoFile(outputPath, g.logger); err != nil {
+	if err := g.LintProtoFile(outputPath, bufPath, g.logger); err != nil {
 		return errors.Wrap(err, "failed to lint proto file")
 	}
 
@@ -114,7 +114,7 @@ func GenerateProtoFilename(dbcFilename string) string {
 }
 
 // GenerateFromDBCFile is the main entry point for proto generation
-func GenerateFromDBCFile(dbcPath, templatePath, outputDir string, logger slog.Logger) error {
+func GenerateFromDBCFile(dbcPath, templatePath, outputDir string, bufPath string, logger slog.Logger) error {
 	// Parse DBC file (using can-go adapter)
 	dbcFile, err := dbc.ParseFile(dbcPath)
 	if err != nil {
@@ -130,7 +130,7 @@ func GenerateFromDBCFile(dbcPath, templatePath, outputDir string, logger slog.Lo
 	generator := NewProtoGenerator(dbcFile, packageName, logger)
 
 	// Generate proto file
-	if err := generator.GenerateProto(templatePath, outputPath); err != nil {
+	if err := generator.GenerateProto(templatePath, outputPath, bufPath); err != nil {
 		return errors.Wrap(err, "failed to generate proto file")
 	}
 
@@ -138,10 +138,10 @@ func GenerateFromDBCFile(dbcPath, templatePath, outputDir string, logger slog.Lo
 	return nil
 }
 
-func (g *ProtoGenerator) LintProtoFile(protoPath string, logger slog.Logger) error {
+func (g *ProtoGenerator) LintProtoFile(protoPath string, bufPath string, logger slog.Logger) error {
 
 	// Format the generated proto file
-	linter := protolint.NewLinter(g.logger)
+	linter := protolint.NewLinter(bufPath, g.logger)
 	if err := linter.Format(protoPath); err != nil {
 		// Log the error but don't fail the generation
 		g.logger.Warn("Failed to format proto file", "error", err)
@@ -152,21 +152,16 @@ func (g *ProtoGenerator) LintProtoFile(protoPath string, logger slog.Logger) err
 	// Run lint on the generated proto file
 	lintResult, err := linter.LintWithBuf(protoPath)
 	if err != nil {
-		// Log the error but don't fail the generation
-		g.logger.Warn("Failed to run buf lint", "error", err)
-		// Try protolint as fallback
-		if protolintResult, protolintErr := linter.LintWithProtolint(protoPath); protolintErr == nil {
-			g.logger.Info("Protolint result:\n" + protolintResult.FormatResult())
-		}
-	} else {
-		// Display lint result
-		g.logger.Info("Buf lint result:\n" + lintResult.FormatResult())
+		return errors.Wrap(err, "failed to run buf lint")
+	}
 
-		// If buf lint has issues, they're already logged as warnings
-		// We don't fail the generation due to lint issues
-		if !lintResult.Success {
-			g.logger.Warn("Generated proto file has lint warnings. Consider fixing them for better code quality.")
-		}
+	// Display lint result
+	g.logger.Info("Buf lint result:\n" + lintResult.FormatResult())
+
+	// If buf lint has issues, they're already logged as warnings
+	// We don't fail the generation due to lint issues
+	if !lintResult.Success {
+		g.logger.Warn("Generated proto file has lint warnings. Consider fixing them for better code quality.")
 	}
 	return nil
 }
