@@ -20,7 +20,7 @@ func NewCommand() *cobra.Command {
 	s := &generator{
 		dbcFile:   "",
 		protoFile: "",
-		outputDir: "generated/proto",
+		outputDir: "generated/proto/v1",
 	}
 
 	cmd := &cobra.Command{
@@ -58,7 +58,6 @@ func (s *generator) run(ctx context.Context, input cli.Input) error {
 		"template", templatePath,
 	)
 
-	// Generate proto file
 	if err := GenerateFromDBCFile(s.dbcFile, templatePath, s.outputDir, input.Logger); err != nil {
 		return errors.Wrap(err, "failed to generate proto file")
 	}

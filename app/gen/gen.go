@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/BIwashi/candecode/pkg/dbc"
+	"github.com/BIwashi/candecode/pkg/protolint"
 	"github.com/cockroachdb/errors"
 )
 
@@ -81,6 +82,10 @@ func (g *ProtoGenerator) GenerateProto(templatePath, outputPath string) error {
 		return errors.Wrap(err, "failed to write proto file")
 	}
 
+	if err := g.LintProtoFile(outputPath, g.logger); err != nil {
+		return errors.Wrap(err, "failed to lint proto file")
+	}
+
 	return nil
 }
 
@@ -95,7 +100,8 @@ func GeneratePackageName(dbcFilename string) string {
 	packageName = strings.ReplaceAll(packageName, "-", "_")
 	packageName = strings.ReplaceAll(packageName, " ", "_")
 
-	return packageName
+	// Add version suffix for buf lint compliance
+	return packageName + ".v1"
 }
 
 // GenerateProtoFilename generates the output proto filename from the DBC filename
@@ -129,5 +135,38 @@ func GenerateFromDBCFile(dbcPath, templatePath, outputDir string, logger slog.Lo
 	}
 
 	logger.Info("Successfully generated proto file", "output_path", outputPath)
+	return nil
+}
+
+func (g *ProtoGenerator) LintProtoFile(protoPath string, logger slog.Logger) error {
+
+	// Format the generated proto file
+	linter := protolint.NewLinter(g.logger)
+	if err := linter.Format(protoPath); err != nil {
+		// Log the error but don't fail the generation
+		g.logger.Warn("Failed to format proto file", "error", err)
+	} else {
+		g.logger.Info("Successfully formatted proto file")
+	}
+
+	// Run lint on the generated proto file
+	lintResult, err := linter.LintWithBuf(protoPath)
+	if err != nil {
+		// Log the error but don't fail the generation
+		g.logger.Warn("Failed to run buf lint", "error", err)
+		// Try protolint as fallback
+		if protolintResult, protolintErr := linter.LintWithProtolint(protoPath); protolintErr == nil {
+			g.logger.Info("Protolint result:\n" + protolintResult.FormatResult())
+		}
+	} else {
+		// Display lint result
+		g.logger.Info("Buf lint result:\n" + lintResult.FormatResult())
+
+		// If buf lint has issues, they're already logged as warnings
+		// We don't fail the generation due to lint issues
+		if !lintResult.Success {
+			g.logger.Warn("Generated proto file has lint warnings. Consider fixing them for better code quality.")
+		}
+	}
 	return nil
 }

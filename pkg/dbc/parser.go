@@ -61,9 +61,14 @@ func ToProtoFieldName(signalName string) string {
 	name := strings.ToLower(signalName)
 	name = regexp.MustCompile(`[^a-z0-9_]+`).ReplaceAllString(name, "_")
 
+	// Handle underscore prefix - replace with "field_"
+	if strings.HasPrefix(name, "_") {
+		name = "field" + name
+	}
+
 	// Ensure it doesn't start with a number
 	if matched, _ := regexp.MatchString(`^\d`, name); matched {
-		name = "_" + name
+		name = "field_" + name
 	}
 
 	return name
