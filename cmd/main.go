@@ -4,7 +4,6 @@ import (
 	"log"
 
 	"github.com/BIwashi/candecode/app/convert"
-	"github.com/BIwashi/candecode/app/gen"
 	"github.com/BIwashi/candecode/pkg/cli"
 )
 
@@ -16,7 +15,7 @@ func main() {
 
 	c.AddCommands(
 		convert.NewCommand(),
-		gen.NewCommand(),
+		// gen.NewCommand(),
 	)
 
 	if err := c.Run(); err != nil {

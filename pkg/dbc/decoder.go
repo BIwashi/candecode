@@ -2,9 +2,10 @@ package dbc
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/BIwashi/candecode/pkg/can"
 	"github.com/cockroachdb/errors"
-	"go.einride.tech/can"
 	"go.einride.tech/can/pkg/descriptor"
 )
 
@@ -13,6 +14,7 @@ type DecodedSignal struct {
 	Physical    *float64
 	Description string
 	Signal      *descriptor.Signal
+	Timestamp   time.Time
 }
 
 type Decoder struct {
@@ -25,7 +27,7 @@ func NewDecoder(compiler *Compiler) *Decoder {
 	}
 }
 
-func (d *Decoder) Decode(f can.Frame) (map[string]DecodedSignal, error) {
+func (d *Decoder) Decode(f *can.TimedFrame) (map[string]DecodedSignal, error) {
 	message, ok := d.compiler.db.Message(f.ID)
 	if !ok {
 		return nil, errors.New(fmt.Sprintf("unknown message id: 0x%X", f.ID))
@@ -48,10 +50,10 @@ func (d *Decoder) Decode(f can.Frame) (map[string]DecodedSignal, error) {
 		if s.IsMultiplexer {
 			mux = s
 			muxVal = s.UnmarshalUnsigned(f.Data)
-			signalsMap[s.Name] = decodeSignal(s, f)
+			signalsMap[s.Name] = decodeSignal(s, *f)
 			continue
 		}
-		signalsMap[s.Name] = decodeSignal(s, f)
+		signalsMap[s.Name] = decodeSignal(s, *f)
 	}
 
 	// decode multiplexed signals
@@ -61,7 +63,7 @@ func (d *Decoder) Decode(f can.Frame) (map[string]DecodedSignal, error) {
 				continue
 			}
 			if muxVal == uint64(s.MultiplexerValue) {
-				signalsMap[s.Name] = decodeSignal(s, f)
+				signalsMap[s.Name] = decodeSignal(s, *f)
 			}
 		}
 	}
@@ -69,7 +71,7 @@ func (d *Decoder) Decode(f can.Frame) (map[string]DecodedSignal, error) {
 	return signalsMap, nil
 }
 
-func decodeSignal(s *descriptor.Signal, f can.Frame) DecodedSignal {
+func decodeSignal(s *descriptor.Signal, f can.TimedFrame) DecodedSignal {
 	var (
 		raw         any
 		physical    *float64
@@ -102,6 +104,7 @@ func decodeSignal(s *descriptor.Signal, f can.Frame) DecodedSignal {
 	}
 
 	return DecodedSignal{
+		Timestamp:   f.Timestamp,
 		Raw:         raw,
 		Physical:    physical,
 		Description: description,
