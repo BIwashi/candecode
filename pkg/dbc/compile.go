@@ -89,6 +89,14 @@ func (c *Compiler) collectDescriptors() {
 	}
 }
 
+func (c *Compiler) Message(id uint32) (*descriptor.Message, bool) {
+	return c.db.Message(id)
+}
+
+func (c *Compiler) SourceFile() string {
+	return c.db.SourceFile
+}
+
 func (c *Compiler) addMetadata() {
 	for _, def := range c.defs {
 		switch def := def.(type) {

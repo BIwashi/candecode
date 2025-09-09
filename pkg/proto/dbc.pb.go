@@ -23,12 +23,24 @@ const (
 )
 
 type DecodedSignal struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Raw           uint64                 `protobuf:"varint,1,opt,name=raw,proto3" json:"raw,omitempty"`
-	Physical      *float64               `protobuf:"fixed64,2,opt,name=physical,proto3,oneof" json:"physical,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Signal        *Signal                `protobuf:"bytes,4,opt,name=signal,proto3" json:"signal,omitempty"`
-	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	MessageName string                 `protobuf:"bytes,1,opt,name=message_name,json=messageName,proto3" json:"message_name,omitempty"`
+	Name        string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Types that are valid to be assigned to Raw:
+	//
+	//	*DecodedSignal_RawU
+	//	*DecodedSignal_RawS
+	//	*DecodedSignal_RawF
+	//	*DecodedSignal_RawB
+	//	*DecodedSignal_RawBytes
+	Raw           isDecodedSignal_Raw    `protobuf_oneof:"raw"`
+	Physical      *float64               `protobuf:"fixed64,8,opt,name=physical,proto3,oneof" json:"physical,omitempty"`
+	Description   string                 `protobuf:"bytes,9,opt,name=description,proto3" json:"description,omitempty"`
+	Signal        *Signal                `protobuf:"bytes,10,opt,name=signal,proto3" json:"signal,omitempty"`
+	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	CanId         uint32                 `protobuf:"varint,12,opt,name=can_id,json=canId,proto3" json:"can_id,omitempty"`
+	IsExtended    bool                   `protobuf:"varint,13,opt,name=is_extended,json=isExtended,proto3" json:"is_extended,omitempty"`
+	FrameBytes    []byte                 `protobuf:"bytes,14,opt,name=frame_bytes,json=frameBytes,proto3" json:"frame_bytes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -63,11 +75,70 @@ func (*DecodedSignal) Descriptor() ([]byte, []int) {
 	return file_pkg_proto_dbc_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *DecodedSignal) GetRaw() uint64 {
+func (x *DecodedSignal) GetMessageName() string {
+	if x != nil {
+		return x.MessageName
+	}
+	return ""
+}
+
+func (x *DecodedSignal) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DecodedSignal) GetRaw() isDecodedSignal_Raw {
 	if x != nil {
 		return x.Raw
 	}
+	return nil
+}
+
+func (x *DecodedSignal) GetRawU() uint64 {
+	if x != nil {
+		if x, ok := x.Raw.(*DecodedSignal_RawU); ok {
+			return x.RawU
+		}
+	}
 	return 0
+}
+
+func (x *DecodedSignal) GetRawS() int64 {
+	if x != nil {
+		if x, ok := x.Raw.(*DecodedSignal_RawS); ok {
+			return x.RawS
+		}
+	}
+	return 0
+}
+
+func (x *DecodedSignal) GetRawF() float64 {
+	if x != nil {
+		if x, ok := x.Raw.(*DecodedSignal_RawF); ok {
+			return x.RawF
+		}
+	}
+	return 0
+}
+
+func (x *DecodedSignal) GetRawB() bool {
+	if x != nil {
+		if x, ok := x.Raw.(*DecodedSignal_RawB); ok {
+			return x.RawB
+		}
+	}
+	return false
+}
+
+func (x *DecodedSignal) GetRawBytes() []byte {
+	if x != nil {
+		if x, ok := x.Raw.(*DecodedSignal_RawBytes); ok {
+			return x.RawBytes
+		}
+	}
+	return nil
 }
 
 func (x *DecodedSignal) GetPhysical() float64 {
@@ -97,6 +168,61 @@ func (x *DecodedSignal) GetTimestamp() *timestamppb.Timestamp {
 	}
 	return nil
 }
+
+func (x *DecodedSignal) GetCanId() uint32 {
+	if x != nil {
+		return x.CanId
+	}
+	return 0
+}
+
+func (x *DecodedSignal) GetIsExtended() bool {
+	if x != nil {
+		return x.IsExtended
+	}
+	return false
+}
+
+func (x *DecodedSignal) GetFrameBytes() []byte {
+	if x != nil {
+		return x.FrameBytes
+	}
+	return nil
+}
+
+type isDecodedSignal_Raw interface {
+	isDecodedSignal_Raw()
+}
+
+type DecodedSignal_RawU struct {
+	RawU uint64 `protobuf:"varint,3,opt,name=raw_u,json=rawU,proto3,oneof"`
+}
+
+type DecodedSignal_RawS struct {
+	RawS int64 `protobuf:"zigzag64,4,opt,name=raw_s,json=rawS,proto3,oneof"`
+}
+
+type DecodedSignal_RawF struct {
+	RawF float64 `protobuf:"fixed64,5,opt,name=raw_f,json=rawF,proto3,oneof"`
+}
+
+type DecodedSignal_RawB struct {
+	RawB bool `protobuf:"varint,6,opt,name=raw_b,json=rawB,proto3,oneof"`
+}
+
+type DecodedSignal_RawBytes struct {
+	RawBytes []byte `protobuf:"bytes,7,opt,name=raw_bytes,json=rawBytes,proto3,oneof"`
+}
+
+func (*DecodedSignal_RawU) isDecodedSignal_Raw() {}
+
+func (*DecodedSignal_RawS) isDecodedSignal_Raw() {}
+
+func (*DecodedSignal_RawF) isDecodedSignal_Raw() {}
+
+func (*DecodedSignal_RawB) isDecodedSignal_Raw() {}
+
+func (*DecodedSignal_RawBytes) isDecodedSignal_Raw() {}
 
 type Signal struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
@@ -342,13 +468,26 @@ var File_pkg_proto_dbc_proto protoreflect.FileDescriptor
 
 const file_pkg_proto_dbc_proto_rawDesc = "" +
 	"\n" +
-	"\x13pkg/proto/dbc.proto\x12\x12candecode.proto.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdf\x01\n" +
-	"\rDecodedSignal\x12\x10\n" +
-	"\x03raw\x18\x01 \x01(\x04R\x03raw\x12\x1f\n" +
-	"\bphysical\x18\x02 \x01(\x01H\x00R\bphysical\x88\x01\x01\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x122\n" +
-	"\x06signal\x18\x04 \x01(\v2\x1a.candecode.proto.v1.SignalR\x06signal\x128\n" +
-	"\ttimestamp\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestampB\v\n" +
+	"\x13pkg/proto/dbc.proto\x12\x12candecode.proto.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdf\x03\n" +
+	"\rDecodedSignal\x12!\n" +
+	"\fmessage_name\x18\x01 \x01(\tR\vmessageName\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x15\n" +
+	"\x05raw_u\x18\x03 \x01(\x04H\x00R\x04rawU\x12\x15\n" +
+	"\x05raw_s\x18\x04 \x01(\x12H\x00R\x04rawS\x12\x15\n" +
+	"\x05raw_f\x18\x05 \x01(\x01H\x00R\x04rawF\x12\x15\n" +
+	"\x05raw_b\x18\x06 \x01(\bH\x00R\x04rawB\x12\x1d\n" +
+	"\traw_bytes\x18\a \x01(\fH\x00R\brawBytes\x12\x1f\n" +
+	"\bphysical\x18\b \x01(\x01H\x01R\bphysical\x88\x01\x01\x12 \n" +
+	"\vdescription\x18\t \x01(\tR\vdescription\x122\n" +
+	"\x06signal\x18\n" +
+	" \x01(\v2\x1a.candecode.proto.v1.SignalR\x06signal\x128\n" +
+	"\ttimestamp\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x15\n" +
+	"\x06can_id\x18\f \x01(\rR\x05canId\x12\x1f\n" +
+	"\vis_extended\x18\r \x01(\bR\n" +
+	"isExtended\x12\x1f\n" +
+	"\vframe_bytes\x18\x0e \x01(\fR\n" +
+	"frameBytesB\x05\n" +
+	"\x03rawB\v\n" +
 	"\t_physical\"\xeb\x04\n" +
 	"\x06Signal\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
@@ -411,7 +550,13 @@ func file_pkg_proto_dbc_proto_init() {
 	if File_pkg_proto_dbc_proto != nil {
 		return
 	}
-	file_pkg_proto_dbc_proto_msgTypes[0].OneofWrappers = []any{}
+	file_pkg_proto_dbc_proto_msgTypes[0].OneofWrappers = []any{
+		(*DecodedSignal_RawU)(nil),
+		(*DecodedSignal_RawS)(nil),
+		(*DecodedSignal_RawF)(nil),
+		(*DecodedSignal_RawB)(nil),
+		(*DecodedSignal_RawBytes)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

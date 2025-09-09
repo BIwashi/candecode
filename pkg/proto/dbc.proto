@@ -7,11 +7,24 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/BIwashi/candecode/pkg/proto;proto";
 
 message DecodedSignal {
-  uint64 raw = 1;
-  optional double physical = 2;
-  string description = 3;
-  Signal signal = 4;
-  google.protobuf.Timestamp timestamp = 5;
+  string message_name = 1;
+  string name = 2;
+
+  oneof raw {
+    uint64 raw_u = 3;
+    sint64 raw_s = 4;
+    double raw_f = 5;
+    bool   raw_b = 6;
+    bytes  raw_bytes = 7;
+  }
+
+  optional double physical = 8;
+  string description = 9;
+  Signal signal = 10;
+  google.protobuf.Timestamp timestamp = 11;
+  uint32 can_id = 12;
+  bool is_extended = 13;
+  bytes frame_bytes = 14;
 }
 
 message Signal {
