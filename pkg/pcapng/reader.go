@@ -4,24 +4,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"time"
 
+	"github.com/BIwashi/candecode/pkg/can"
 	"github.com/cockroachdb/errors"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
+	ecan "go.einride.tech/can"
 )
-
-// CANFrame represents a CAN frame extracted from PCAPNG
-type CANFrame struct {
-	CanID       uint32
-	Data        []byte
-	Timestamp   time.Time
-	TimestampNs uint64
-	IsExtended  bool
-	IsError     bool
-	IsRemote    bool
-}
 
 // Reader reads CAN frames from PCAPNG file
 type Reader struct {
@@ -47,7 +37,7 @@ func NewReader(r io.Reader) (*Reader, error) {
 }
 
 // ReadNext reads the next CAN frame from the PCAPNG file
-func (r *Reader) ReadNext() (*CANFrame, error) {
+func (r *Reader) ReadNext() (*can.TimedFrame, error) {
 	for {
 		data, ci, err := r.reader.ReadPacketData()
 		if err != nil {
@@ -74,104 +64,67 @@ func (r *Reader) ReadNext() (*CANFrame, error) {
 }
 
 // extractCANFrame extracts CAN frame from the packet
-func (r *Reader) extractCANFrame(packet gopacket.Packet, ci gopacket.CaptureInfo) (*CANFrame, error) {
-	// Check if this is a Linux SLL (Linux cooked capture) packet
-	if r.linkType == layers.LinkTypeLinuxSLL {
-		return r.extractSocketCANFrame(packet, ci)
-	}
-
-	// Check if this is raw CAN
-	if r.linkType == 227 { // LinkTypeCAN
-		return r.extractRawCANFrame(packet.Data(), ci)
-	}
-
-	return nil, fmt.Errorf("unsupported link type: %v", r.linkType)
-}
-
-// extractSocketCANFrame extracts CAN frame from SocketCAN format
-func (r *Reader) extractSocketCANFrame(packet gopacket.Packet, ci gopacket.CaptureInfo) (*CANFrame, error) {
-	// Get the raw packet data after the Linux SLL header
+func (r *Reader) extractCANFrame(packet gopacket.Packet, ci gopacket.CaptureInfo) (*can.TimedFrame, error) {
 	var payload []byte
-
-	// Check for Linux SLL layer
-	if sllLayer := packet.Layer(layers.LayerTypeLinuxSLL); sllLayer != nil {
-		sll := sllLayer.(*layers.LinuxSLL)
-		payload = sll.Payload
-	} else {
-		// Try to parse as raw data
+	switch r.linkType {
+	case layers.LinkTypeLinuxSLL:
+		// Check if this is a Linux SLL (Linux cooked capture) packet
+		if sllLayer := packet.Layer(layers.LayerTypeLinuxSLL); sllLayer != nil {
+			sll := sllLayer.(*layers.LinuxSLL)
+			payload = sll.Payload
+		} else {
+			// Try to parse as raw data
+			payload = packet.Data()
+		}
+	case 227: // LinkTypeCAN ref: https://www.tcpdump.org/linktypes.html
+		// Check if this is raw CAN
 		payload = packet.Data()
+	default:
+		return nil, fmt.Errorf("unsupported link type: %v", r.linkType)
 	}
 
-	// SocketCAN frame format:
-	// 4 bytes: CAN ID (with flags in upper bits)
-	// 1 byte: Data length
-	// 3 bytes: Padding
-	// 8 bytes: Data (max)
-
-	if len(payload) < 8 {
-		return nil, fmt.Errorf("payload too short for CAN frame")
+	canFrame, isError, err := r.extractRawCANFrame(payload, ci)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to extract RawCAN frame")
+	}
+	if isError {
+		return nil, errors.New("error in RawCAN frame")
 	}
 
-	// Parse CAN ID and flags
-	canIDRaw := binary.LittleEndian.Uint32(payload[0:4])
-
-	// Extract flags from CAN ID
-	isExtended := (canIDRaw & 0x80000000) != 0
-	isRemote := (canIDRaw & 0x40000000) != 0
-	isError := (canIDRaw & 0x20000000) != 0
-
-	// Extract actual CAN ID
-	var canID uint32
-	if isExtended {
-		canID = canIDRaw & 0x1FFFFFFF
-	} else {
-		canID = canIDRaw & 0x7FF
-	}
-
-	// Get data length
-	dataLen := payload[4]
-	if dataLen > 8 {
-		dataLen = 8
-	}
-
-	// Extract data
-	data := make([]byte, dataLen)
-	if len(payload) >= 8+int(dataLen) {
-		copy(data, payload[8:8+dataLen])
-	}
-
-	return &CANFrame{
-		CanID:       canID,
-		Data:        data,
-		Timestamp:   ci.Timestamp,
-		TimestampNs: uint64(ci.Timestamp.UnixNano()),
-		IsExtended:  isExtended,
-		IsError:     isError,
-		IsRemote:    isRemote,
-	}, nil
+	return canFrame, nil
 }
+
+const (
+	idFlagExtended = 0x80000000
+	idFlagRemote   = 0x40000000
+	idFlagError    = 0x20000000
+	idMaskExtended = 0x1fffffff
+	idMaskStandard = 0x7ff
+)
 
 // extractRawCANFrame extracts CAN frame from raw CAN format
-func (r *Reader) extractRawCANFrame(data []byte, ci gopacket.CaptureInfo) (*CANFrame, error) {
+func (r *Reader) extractRawCANFrame(data []byte, ci gopacket.CaptureInfo) (*can.TimedFrame, bool, error) {
 	// Raw CAN frame format (similar to SocketCAN but without SLL header)
 	if len(data) < 8 {
-		return nil, fmt.Errorf("data too short for CAN frame")
+		return nil, false, errors.New(fmt.Sprintf("data too short for CAN frame: %d", len(data)))
 	}
 
-	// Parse CAN ID and flags
-	canIDRaw := binary.LittleEndian.Uint32(data[0:4])
+	var (
+		// Parse CAN ID and flags
+		canIDRaw = binary.LittleEndian.Uint32(data[0:4])
 
-	// Extract flags from CAN ID
-	isExtended := (canIDRaw & 0x80000000) != 0
-	isRemote := (canIDRaw & 0x40000000) != 0
-	isError := (canIDRaw & 0x20000000) != 0
+		// Extract flags from CAN ID
+		isExtended = (canIDRaw & idFlagExtended) != 0
+		isRemote   = (canIDRaw & idFlagRemote) != 0
+		isError    = (canIDRaw & idFlagError) != 0
+	)
 
 	// Extract actual CAN ID
 	var canID uint32
 	if isExtended {
-		canID = canIDRaw & 0x1FFFFFFF
+		canID = canIDRaw & idMaskExtended
 	} else {
-		canID = canIDRaw & 0x7FF
+		canID = canIDRaw & idMaskStandard
 	}
 
 	// Get data length
@@ -181,20 +134,21 @@ func (r *Reader) extractRawCANFrame(data []byte, ci gopacket.CaptureInfo) (*CANF
 	}
 
 	// Extract data
-	canData := make([]byte, dataLen)
+	var canData ecan.Data
 	if len(data) >= 8+int(dataLen) {
-		copy(canData, data[8:8+dataLen])
+		copy(canData[:], data[8:8+dataLen])
 	}
 
-	return &CANFrame{
-		CanID:       canID,
-		Data:        canData,
-		Timestamp:   ci.Timestamp,
-		TimestampNs: uint64(ci.Timestamp.UnixNano()),
-		IsExtended:  isExtended,
-		IsError:     isError,
-		IsRemote:    isRemote,
-	}, nil
+	return &can.TimedFrame{
+		Frame: ecan.Frame{
+			ID:         canID,
+			Length:     dataLen,
+			Data:       canData,
+			IsRemote:   isRemote,
+			IsExtended: isExtended,
+		},
+		Timestamp: ci.Timestamp,
+	}, isError, nil
 }
 
 // GetPacketCount returns the number of packets read
@@ -203,6 +157,6 @@ func (r *Reader) GetPacketCount() uint64 {
 }
 
 // ReadFrame provides backward-compatible name expected by converter code.
-func (r *Reader) ReadFrame() (*CANFrame, error) {
+func (r *Reader) ReadFrame() (*can.TimedFrame, error) {
 	return r.ReadNext()
 }
