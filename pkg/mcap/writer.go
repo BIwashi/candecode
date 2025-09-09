@@ -10,6 +10,8 @@ import (
 	"github.com/foxglove/mcap/go/mcap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/types/descriptorpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // Writer writes DecodedSignal proto messages into an MCAP file.
@@ -48,11 +50,19 @@ func NewWriter(out io.Writer) (*Writer, error) {
 		return nil, fmt.Errorf("write header: %w", err)
 	}
 
-	// Prepare schema descriptor bytes (FileDescriptorProto marshal).
-	fdProto := protodesc.ToFileDescriptorProto(candecodeproto.File_pkg_proto_dbc_proto)
-	data, err := proto.Marshal(fdProto)
+	// Prepare schema descriptor bytes as FileDescriptorSet (include dependencies).
+	fdMain := protodesc.ToFileDescriptorProto(candecodeproto.File_pkg_proto_dbc_proto)
+	fdTimestamp := protodesc.ToFileDescriptorProto(timestamppb.File_google_protobuf_timestamp_proto)
+
+	fdSet := &descriptorpb.FileDescriptorSet{
+		File: []*descriptorpb.FileDescriptorProto{
+			fdMain,
+			fdTimestamp,
+		},
+	}
+	data, err := proto.Marshal(fdSet)
 	if err != nil {
-		return nil, fmt.Errorf("marshal schema descriptor: %w", err)
+		return nil, fmt.Errorf("marshal FileDescriptorSet: %w", err)
 	}
 
 	schemaID := uint16(1)
@@ -68,7 +78,7 @@ func NewWriter(out io.Writer) (*Writer, error) {
 	return &Writer{
 		writer:     w,
 		schemaID:   schemaID,
-		nextChanID: 1, // channels start at 1 (schema already used 1 but MCAP allows independent IDs)
+		nextChanID: 1, // first channel will get ID=1
 		channels:   make(map[string]uint16),
 	}, nil
 }
@@ -89,9 +99,9 @@ func (w *Writer) ensureChannel(canID uint32, isExtended bool, messageName, signa
 		return id, nil
 	}
 
-	// allocate new channel id
-	w.nextChanID++
+	// allocate new channel id (post-increment style so first channel=1)
 	chID := w.nextChanID
+	w.nextChanID++
 
 	topic := fmt.Sprintf("/can/%s/%s", messageName, signalName)
 	metadata := map[string]string{
