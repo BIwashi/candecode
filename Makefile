@@ -43,6 +43,12 @@ build/opendbc: ## Build opendbc files ## make build/opendbc
 	@echo "Building opendbc files..."
 	uv run scons -C third_party/opendbc -j8
 
+.PHONY: build/buf
+build/buf: $(BUF)
+build/buf: ## Build buf ## make build/buf
+	@echo "Building buf..."
+	@$(BUF) generate
+
 .PHONY: build/cmd
 build/cmd: ## Build cmd ## make build/cmd
 build/cmd: CGO_ENABLED ?= 0
@@ -56,7 +62,7 @@ build/cmd:
 	@echo "Binary built: $(BIN_DIR)/candecode"
 
 .PHONY: build
-build: build/cmd ## Build all components ## make build
+build: build/opendbc build/buf build/cmd ## Build all components ## make build
 
 ##### DEV #####
 
