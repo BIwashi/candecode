@@ -5,7 +5,6 @@ import (
 	"math"
 
 	"github.com/BIwashi/candecode/pkg/dbc"
-	"github.com/BIwashi/candecode/pkg/pcapng"
 	"github.com/cockroachdb/errors"
 )
 
@@ -39,25 +38,25 @@ func NewDecoder(dbcFile *dbc.DBCFile) *Decoder {
 }
 
 // DecodeFrame decodes a CAN frame into a DecodedMessage
-func (d *Decoder) DecodeFrame(frame *pcapng.CANFrame) (*DecodedMessage, error) {
+func (d *Decoder) DecodeFrame(frame *TimedFrame) (*DecodedMessage, error) {
 	// Get message definition from DBC
-	message, ok := d.dbcFile.GetMessage(frame.CanID)
+	message, ok := d.dbcFile.GetMessage(frame.ID)
 	if !ok {
 		// Unknown message ID
-		return nil, fmt.Errorf("unknown CAN ID: 0x%X", frame.CanID)
+		return nil, fmt.Errorf("unknown CAN ID: 0x%X", frame.ID)
 	}
 
 	decoded := &DecodedMessage{
 		MessageName: message.Name,
-		MessageID:   frame.CanID,
-		RawData:     frame.Data,
-		TimestampNs: frame.TimestampNs,
+		MessageID:   frame.ID,
+		RawData:     frame.Data[:],
+		TimestampNs: uint64(frame.Timestamp.UnixNano()),
 		Signals:     make(map[string]SignalValue),
 	}
 
 	// Decode each signal
 	for _, signal := range message.Signals {
-		rawValue, err := extractSignalValue(frame.Data, &signal)
+		rawValue, err := extractSignalValue(frame.Data[:], &signal)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to extract signal %s", signal.Name)
 		}
