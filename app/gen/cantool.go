@@ -72,6 +72,10 @@ func runCantool(ctx context.Context, dbcPath string, logger slog.Logger) (string
 		"output_dir", outDir,
 	)
 
+	if err := deleteFileIfExists(dest); err != nil {
+		return "", errors.Wrap(err, "delete temporary dbc file")
+	}
+
 	outFileName := base[:len(base)-len(filepath.Ext(base))] + ".dbc.go"
 
 	return outFileName, nil
@@ -101,5 +105,14 @@ func copyFile(src, dst string) error {
 		return err
 	}
 
+	return nil
+}
+
+func deleteFileIfExists(path string) error {
+	if _, err := os.Stat(path); err == nil {
+		return os.Remove(path)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
 	return nil
 }
