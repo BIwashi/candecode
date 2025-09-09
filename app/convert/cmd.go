@@ -6,13 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/BIwashi/candecode/pkg/can"
 	"github.com/BIwashi/candecode/pkg/cli"
 	"github.com/BIwashi/candecode/pkg/dbc"
-	"github.com/BIwashi/candecode/pkg/mcap"
 	"github.com/BIwashi/candecode/pkg/pcapng"
+	"github.com/cockroachdb/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -62,6 +60,7 @@ candecode convert --dbc-file toyota.dbc --pcapng-file capture.pcapng --mcap-file
 }
 
 func (s *converter) run(ctx context.Context, input cli.Input) error {
+	logger := input.Logger
 	// Generate MCAP filename from PCAPNG filename if not specified
 	if s.mcapFile == "" {
 		// Get base filename without extension
@@ -76,21 +75,21 @@ func (s *converter) run(ctx context.Context, input cli.Input) error {
 		"mcap_file", s.mcapFile,
 	)
 
-	// Parse DBC file
-	input.Logger.Info("Parsing DBC file...")
-	dbcData, err := dbc.ParseFile(s.dbcFile)
-	if err != nil {
-		return fmt.Errorf("failed to parse DBC file: %w", err)
-	}
-	input.Logger.Info(fmt.Sprintf("Found %d messages in DBC file", len(dbcData.Messages)))
+	// // Parse DBC file
+	// input.Logger.Info("Parsing DBC file...")
+	// dbcData, err := dbc.ParseFile(s.dbcFile)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to parse DBC file: %w", err)
+	// }
+	// input.Logger.Info(fmt.Sprintf("Found %d messages in DBC file", len(dbcData.Messages)))
 
 	// Open PCAPNG file
-	input.Logger.Info("Opening PCAPNG file...")
+	logger.Info("Opening PCAPNG file...")
 	pcapFile, err := os.Open(s.pcapngFile)
 	if err != nil {
 		return fmt.Errorf("failed to open PCAPNG file: %w", err)
 	}
-	defer func() { _ = pcapFile.Close() }()
+	defer pcapFile.Close()
 
 	// Create PCAPNG reader
 	reader, err := pcapng.NewReader(pcapFile)
@@ -98,47 +97,24 @@ func (s *converter) run(ctx context.Context, input cli.Input) error {
 		return fmt.Errorf("failed to create PCAPNG reader: %w", err)
 	}
 
-	// Create MCAP file
-	input.Logger.Info("Creating MCAP file...")
-
-	// Create MCAP directory if it doesn't exist
-	mcapDir := filepath.Dir(s.mcapFile)
-	if err := os.MkdirAll(mcapDir, 0755); err != nil {
-		return fmt.Errorf("failed to create MCAP directory: %w", err)
-	}
-
-	mcapOutFile, err := os.Create(s.mcapFile)
+	// Create DBC compiler
+	compiler, err := dbc.NewCompiler(s.dbcFile)
 	if err != nil {
-		return fmt.Errorf("failed to create MCAP file: %w", err)
+		return fmt.Errorf("failed to create DBC compiler: %w", err)
 	}
-	defer mcapOutFile.Close()
-
-	// Create MCAP writer (with empty proto schema, will be generated from DBC)
-	writer, err := mcap.NewWriter(mcapOutFile, dbcData, []byte{})
-	if err != nil {
-		return fmt.Errorf("failed to create MCAP writer: %w", err)
-	}
-	defer writer.Close()
-
-	// Create CAN decoder
-	decoder := can.NewDecoder(dbcData)
+	decoder := dbc.NewDecoder(compiler)
 
 	// Process frames
-	input.Logger.Info("Converting CAN frames...")
+	logger.Info("Converting CAN frames...")
 	var (
-		frameCount      = 0
-		messageCount    = 0
-		skippedCount    = 0
-		outOfRangeCount = 0
-		startTime       = time.Now()
-		msgCounts       = make(map[uint32]int)
+		frameCount = 0
 	)
 
 	for {
 		// Check context cancellation
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("conversion cancelled: %w", ctx.Err())
+			return errors.Wrap(ctx.Err(), "conversion cancelled")
 		default:
 			// Continue processing
 		}
@@ -151,77 +127,19 @@ func (s *converter) run(ctx context.Context, input cli.Input) error {
 			return fmt.Errorf("failed to read frame: %w", err)
 		}
 
-		frameCount++
-
-		// Decode CAN frame
-		decodedMsg, err := decoder.DecodeFrame(frame)
+		decodedSignal, err := decoder.Decode(frame)
 		if err != nil {
-			// Skip frames that can't be decoded (unknown message IDs)
-			skippedCount++
+			// logger.Error("failed to decode frame", "error", err)
 			continue
 		}
 
-		// Write to MCAP
-		timestamp := frame.Timestamp
-
-		// Out-of-range validation (no clamp) against DBC metadata
-		if dbcMsg, ok := dbcData.GetMessage(decodedMsg.MessageID); ok {
-			for _, sigDef := range dbcMsg.Signals {
-				if sv, ok := decodedMsg.Signals[sigDef.Name]; ok {
-					if sigDef.Min != 0 || sigDef.Max != 0 {
-						if sv.PhysicalValue < sigDef.Min || sv.PhysicalValue > sigDef.Max {
-							outOfRangeCount++
-							input.Logger.Debug("signal_out_of_range",
-								"can_id", fmt.Sprintf("0x%03X", decodedMsg.MessageID),
-								"message", decodedMsg.MessageName,
-								"signal", sigDef.Name,
-								"value", sv.PhysicalValue,
-								"min", sigDef.Min,
-								"max", sigDef.Max,
-							)
-						}
-					}
-				}
+		for _, signal := range decodedSignal {
+			if signal.Physical != nil {
+				fmt.Printf("%+v: %+v: %+v %+v\n", signal.Timestamp, signal.Signal.Name, *signal.Physical, signal.Signal.Unit)
 			}
 		}
 
-		if err := writer.WriteMessage(decodedMsg, timestamp); err != nil {
-			return fmt.Errorf("failed to write message: %w", err)
-		}
-
-		messageCount++
-		msgCounts[decodedMsg.MessageID]++
-
-		// Progress reporting every 10000 frames
-		if frameCount%10000 == 0 {
-			input.Logger.Info(fmt.Sprintf("Progress: %d frames processed, %d messages decoded, %d skipped",
-				frameCount, messageCount, skippedCount))
-		}
-	}
-
-	duration := time.Since(startTime)
-
-	// Print summary
-	input.Logger.Info("Conversion completed successfully!",
-		"total_frames", frameCount,
-		"decoded_messages", messageCount,
-		"skipped_frames", skippedCount,
-		"out_of_range_signals", outOfRangeCount,
-		"output_file", s.mcapFile,
-		"duration", duration,
-		"rate_fps", fmt.Sprintf("%.2f", float64(frameCount)/duration.Seconds()),
-	)
-
-	// Print message breakdown
-	if len(msgCounts) > 0 {
-		input.Logger.Info(fmt.Sprintf("Found %d unique message types", len(msgCounts)))
-		for msgID, count := range msgCounts {
-			if msg, ok := dbcData.GetMessage(msgID); ok {
-				input.Logger.Debug(fmt.Sprintf("  0x%03X (%s): %d messages", msgID, msg.Name, count))
-			} else {
-				input.Logger.Debug(fmt.Sprintf("  0x%03X: %d messages", msgID, count))
-			}
-		}
+		frameCount++
 	}
 
 	return nil

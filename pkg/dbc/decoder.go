@@ -104,10 +104,10 @@ func decodeSignal(s *descriptor.Signal, f can.TimedFrame) DecodedSignal {
 	}
 
 	return DecodedSignal{
-		Timestamp:   f.Timestamp,
 		Raw:         raw,
 		Physical:    physical,
 		Description: description,
 		Signal:      s,
+		Timestamp:   f.Timestamp,
 	}
 }
