@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cockroachdb/errors"
 	"github.com/foxglove/mcap/go/mcap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
@@ -32,40 +33,62 @@ type Writer struct {
 	channels   map[string]uint16 // key: canID_hex + ":" + signalName
 }
 
+type WriterOption interface {
+	apply(*writerOptions)
+}
+
+type writerOptions struct {
+	chunked     bool
+	compression mcap.CompressionFormat
+	chunkSize   int64
+}
+
 // NewWriter initializes an MCAP writer with the DecodedSignal schema registered.
 // The provided io.Writer should be an opened file (will not be closed here).
-func NewWriter(out io.Writer) (*Writer, error) {
+func NewWriter(out io.Writer, opts ...WriterOption) (*Writer, error) {
+	opt := &writerOptions{
+		chunked:     true,
+		chunkSize:   100 * 1024 * 1024, // 100MB chunks
+		compression: mcap.CompressionZSTD,
+	}
+	for _, o := range opts {
+		o.apply(opt)
+	}
+
 	w, err := mcap.NewWriter(out, &mcap.WriterOptions{
-		Chunked:     true,
-		ChunkSize:   2 * 1024 * 1024, // 2MB chunks
-		Compression: mcap.CompressionZSTD,
+		Chunked:     opt.chunked,
+		ChunkSize:   opt.chunkSize,
+		Compression: opt.compression,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("create MCAP writer: %w", err)
+		return nil, errors.Wrap(err, "create MCAP writer")
 	}
 
 	if err := w.WriteHeader(&mcap.Header{
 		Profile: "",
 		Library: "candecode",
 	}); err != nil {
-		return nil, fmt.Errorf("write header: %w", err)
+		return nil, errors.Wrap(err, "write header")
 	}
 
-	// Prepare schema descriptor bytes as FileDescriptorSet (include dependencies).
-	fdMain := protodesc.ToFileDescriptorProto(candecodeproto.File_pkg_proto_dbc_proto)
-	fdTimestamp := protodesc.ToFileDescriptorProto(timestamppb.File_google_protobuf_timestamp_proto)
+	var (
+		// Prepare schema descriptor bytes as FileDescriptorSet (include dependencies).
+		fdMain      = protodesc.ToFileDescriptorProto(candecodeproto.File_pkg_proto_dbc_proto)
+		fdTimestamp = protodesc.ToFileDescriptorProto(timestamppb.File_google_protobuf_timestamp_proto)
+		fdSet       = &descriptorpb.FileDescriptorSet{
+			File: []*descriptorpb.FileDescriptorProto{
+				fdMain,
+				fdTimestamp,
+			},
+		}
+	)
 
-	fdSet := &descriptorpb.FileDescriptorSet{
-		File: []*descriptorpb.FileDescriptorProto{
-			fdMain,
-			fdTimestamp,
-		},
-	}
 	data, err := proto.Marshal(fdSet)
 	if err != nil {
-		return nil, fmt.Errorf("marshal FileDescriptorSet: %w", err)
+		return nil, errors.Wrap(err, "marshal FileDescriptorSet")
 	}
 
+	// Set mcap schema (protobuf encoded FileDescriptorSet)
 	schemaID := uint16(1)
 	if err := w.WriteSchema(&mcap.Schema{
 		ID:       schemaID,
@@ -73,7 +96,7 @@ func NewWriter(out io.Writer) (*Writer, error) {
 		Encoding: "protobuf",
 		Data:     data,
 	}); err != nil {
-		return nil, fmt.Errorf("write schema: %w", err)
+		return nil, errors.Wrap(err, "write schema")
 	}
 
 	return &Writer{
@@ -94,23 +117,26 @@ func (w *Writer) ensureChannel(canID uint32, isExtended bool, messageName, signa
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	hexID := fmt.Sprintf("0x%X", canID)
-	key := channelKey(hexID, signalName)
+	var (
+		hexID = fmt.Sprintf("0x%X", canID)
+		key   = channelKey(hexID, signalName)
+	)
 	if id, ok := w.channels[key]; ok {
 		return id, nil
 	}
 
 	// allocate new channel id (post-increment style so first channel=1)
-	chID := w.nextChanID
+	var (
+		chID     = w.nextChanID
+		topic    = fmt.Sprintf("/can/%s/%s", messageName, signalName)
+		metadata = map[string]string{
+			"can_id":      hexID,
+			"message":     messageName,
+			"signal":      signalName,
+			"is_extended": fmt.Sprintf("%t", isExtended),
+		}
+	)
 	w.nextChanID++
-
-	topic := fmt.Sprintf("/can/%s/%s", messageName, signalName)
-	metadata := map[string]string{
-		"can_id":      hexID,
-		"message":     messageName,
-		"signal":      signalName,
-		"is_extended": fmt.Sprintf("%t", isExtended),
-	}
 	if unit != "" {
 		metadata["unit"] = unit
 	}
@@ -122,7 +148,7 @@ func (w *Writer) ensureChannel(canID uint32, isExtended bool, messageName, signa
 		MessageEncoding: "protobuf",
 		Metadata:        metadata,
 	}); err != nil {
-		return 0, fmt.Errorf("write channel (topic=%s): %w", topic, err)
+		return 0, errors.Wrap(err, fmt.Sprintf("write channel (topic=%s)", topic))
 	}
 
 	w.channels[key] = chID
@@ -133,28 +159,32 @@ func (w *Writer) ensureChannel(canID uint32, isExtended bool, messageName, signa
 // ds.Timestamp must be set. LogTime/PublishTime use that timestamp.
 func (w *Writer) WriteDecodedSignal(ds *candecodeproto.DecodedSignal) error {
 	if ds == nil {
-		return fmt.Errorf("nil DecodedSignal")
+		return errors.New("nil DecodedSignal")
 	}
-	ts := time.Now()
+
+	var ts time.Time // fallback to zero time
 	if t := ds.GetTimestamp(); t != nil {
 		ts = t.AsTime()
 	}
+
 	channelID, err := w.ensureChannel(ds.GetCanId(), ds.GetIsExtended(), ds.GetMessageName(), ds.GetName(), ds.GetSignal().GetUnit())
 	if err != nil {
-		return err
+		return errors.Wrap(err, "ensure channel")
 	}
+
 	data, err := proto.Marshal(ds)
 	if err != nil {
-		return fmt.Errorf("marshal DecodedSignal: %w", err)
+		return errors.Wrap(err, "marshal DecodedSignal")
 	}
+
 	if err := w.writer.WriteMessage(&mcap.Message{
 		ChannelID:   channelID,
 		Sequence:    0,
 		LogTime:     uint64(ts.UnixNano()),
-		PublishTime: uint64(ts.UnixNano()),
+		PublishTime: uint64(time.Now().UnixNano()),
 		Data:        data,
 	}); err != nil {
-		return fmt.Errorf("write message: %w", err)
+		return errors.Wrap(err, "write message")
 	}
 	return nil
 }
