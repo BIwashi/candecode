@@ -15,7 +15,6 @@ func main() {
 
 	c.AddCommands(
 		convert.NewCommand(),
-		// gen.NewCommand(),
 	)
 
 	if err := c.Run(); err != nil {
