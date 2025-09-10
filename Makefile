@@ -48,7 +48,7 @@ OPENDBC_DBC_DIR 		:= $(OPENDBC_DIR)/opendbc/dbc
 OPENDBC_SOURCES 		:= $(shell find $(OPENDBC_GENERATOR_DIR) -name "*.py" -o \( -name "*.dbc" -not -name "*_generated.dbc" \) 2>/dev/null)
 OPENDBC_STAMP 			:= $(BIN_DIR)/.opendbc_stamp
 # candecode build target with dependency tracking
-CANDECODE_SOURCES		:= $(shell find . -name "*.go" -not -path "./third_party/*" 2>/dev/null) go.mod go.sum
+CANDECODE_SOURCES		:= $(shell find . -name "*.go" -not -path "$(OPENDBC_DIR)/*" 2>/dev/null) go.mod go.sum
 CANDECODE_BINARY		:= $(BIN_DIR)/candecode
 # buf build target with dependency tracking
 BUF_PROTO_DIR			:= pkg/proto
