@@ -40,17 +40,29 @@ lint: ## Run all lint ## make lint
 
 ##### BUILD #####
 
+# build targets
 # opendbc build target with dependency tracking
 OPENDBC_DIR 			:= third_party/opendbc
 OPENDBC_GENERATOR_DIR 	:= $(OPENDBC_DIR)/opendbc/dbc/generator
 OPENDBC_DBC_DIR 		:= $(OPENDBC_DIR)/opendbc/dbc
 OPENDBC_SOURCES 		:= $(shell find $(OPENDBC_GENERATOR_DIR) -name "*.py" -o -name "*.dbc" 2>/dev/null)
 OPENDBC_TARGETS 		:= $(OPENDBC_DBC_DIR)/.opendbc_built
+# candecode build target with dependency tracking
+CANDECODE_SOURCES		:= $(shell find . -name "*.go" -not -path "./third_party/*" 2>/dev/null) go.mod go.sum
+CANDECODE_BINARY		:= $(BIN_DIR)/candecode
+# buf build target with dependency tracking
 
 $(OPENDBC_TARGETS): $(OPENDBC_SOURCES)
 	@echo "Building opendbc files..."
 	uv run scons -C $(OPENDBC_DIR) -j8
 	@touch $(OPENDBC_TARGETS)
+
+$(CANDECODE_BINARY): $(CANDECODE_SOURCES)
+	@echo "Building candecode binary..."
+	@mkdir -p $(BIN_DIR)
+	@go mod tidy
+	@$(BUILD_ENV) go build $(BUILD_OPTS) -o $(CANDECODE_BINARY) ./cmd/main.go
+	@echo "Binary built: $(CANDECODE_BINARY)"
 
 .PHONY: build/opendbc
 build/opendbc: setup $(OPENDBC_TARGETS) ## Build opendbc files ## make build/opendbc
@@ -63,15 +75,13 @@ build/buf: ## Build buf ## make build/buf
 
 .PHONY: build/cmd
 build/cmd: ## Build cmd ## make build/cmd
+build/cmd: $(BUF_TARGETS)
 build/cmd: CGO_ENABLED ?= 0
 build/cmd: BUILD_OS ?= $(OS)
 build/cmd: BUILD_ARCH ?= $(ARCH)
 build/cmd: BUILD_ENV ?= GOOS=$(BUILD_OS) GOARCH=$(BUILD_ARCH) CGO_ENABLED=$(CGO_ENABLED)
 build/cmd: BUILD_OPTS ?= -trimpath -ldflags "-s -w -extldflags -static"
-build/cmd:
-	@echo "Building candecode binary..."
-	@$(BUILD_ENV) go build $(BUILD_OPTS) -o $(BIN_DIR)/candecode ./cmd/main.go
-	@echo "Binary built: $(BIN_DIR)/candecode"
+build/cmd: $(CANDECODE_BINARY)
 
 .PHONY: build
 build: build/opendbc build/buf build/cmd ## Build all components ## make build
@@ -80,12 +90,12 @@ build: build/opendbc build/buf build/cmd ## Build all components ## make build
 
 .PHONY: run/convert
 run/convert: ## Convert PCAPNG to MCAP ## make run/convert PCAPNG=input.pcapng DBC=toyota.dbc
-run/convert: $(OPENDBC_TARGETS)
+run/convert: $(OPENDBC_TARGETS) $(CANDECODE_BINARY)
 run/convert: PCAPNG ?=
 run/convert: DBC ?=
 run/convert:
 	@echo "Converting PCAPNG to MCAP..."
-	@$(BIN_DIR)/candecode convert --pcapng-file $(PCAPNG) --dbc-file $(DBC)
+	@$(CANDECODE_BINARY) convert --pcapng-file $(PCAPNG) --dbc-file $(DBC)
 
 ##### TEST #####
 
