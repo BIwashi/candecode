@@ -3,10 +3,11 @@
 OS   		:= $(shell uname | awk '{print tolower($$0)}')
 ARCH 		:= $(shell case $$(uname -m) in (x86_64) echo amd64 ;; (aarch64) echo arm64 ;; (*) echo $$(uname -m) ;; esac)
 BIN_DIR		:= ./bin
-BUF_VERSION	:= 1.57.0
-BUF			:= $(abspath $(BIN_DIR)/buf)
 
 ##### BINARY #####
+
+BUF_VERSION	:= 1.57.0
+BUF			:= $(abspath $(BIN_DIR)/buf)
 
 buf: $(BUF)
 $(BUF):
@@ -125,7 +126,8 @@ clean/opendbc: ## Clean opendbc build files ## make clean/opendbc
 .PHONY: clean/bin
 clean/bin: ## Clean binary files ## make clean/bin
 	@echo "Cleaning binary files..."
-	rm -rf $(BIN_DIR)/*
+	@rm -rf $(BIN_DIR)/*
+	@rm -f $(OPENDBC_STAMP)
 
 .PHONY: clean
 clean: clean/opendbc clean/bin ## Clean all files ## make clean
