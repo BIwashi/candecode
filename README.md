@@ -71,7 +71,7 @@ Required flags:
 ## Example
 ```bash
 ./bin/candecode convert \
-  --dbc-file third_party/opendbc/opendbc/dbc/toyota_adas.dbc \
+  --dbc-file path/to/reference.dbc \
   --pcapng-file tests/sample_can_capture.pcapng
 # Produces mcap/sample_can_capture.mcap
 ```
