@@ -8,6 +8,7 @@ BUF			:= $(abspath $(BIN_DIR)/buf)
 PROTOLINT_VERSION := 0.55.0
 
 ##### BINARY #####
+
 buf: $(BUF)
 $(BUF):
 	@curl -sSL "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-$(shell uname -s)-$(shell uname -m)" -o $(BUF) && chmod +x $(BUF)
@@ -64,21 +65,15 @@ build/cmd:
 .PHONY: build
 build: build/opendbc build/buf build/cmd ## Build all components ## make build
 
-##### DEV #####
+##### RUN #####
 
-
-.PHONY: dev/convert
-dev/convert: build ## Convert PCAPNG to MCAP ## make dev/convert PCAPNG=input.pcapng DBC=toyota.dbc
-dev/convert: PCAPNG ?= pcapng/can_00001_20250908185300.pcapng
-dev/convert: DBC ?= third_party/opendbc/opendbc/dbc/toyota_new_mc_pt_generated.dbc
-dev/convert:
-ifdef MCAP
-	@echo "Converting PCAPNG to MCAP..."
-	@$(BIN_DIR)/candecode convert --pcapng-file $(PCAPNG) --dbc-file $(DBC) --mcap-file $(MCAP)
-else
+.PHONY: run/convert
+run/convert: build ## Convert PCAPNG to MCAP ## make run/convert PCAPNG=input.pcapng DBC=toyota.dbc
+run/convert: PCAPNG ?= pcapng/can_00001_20250908185300.pcapng
+run/convert: DBC ?= third_party/opendbc/opendbc/dbc/toyota_new_mc_pt_generated.dbc
+run/convert:
 	@echo "Converting PCAPNG to MCAP..."
 	@$(BIN_DIR)/candecode convert --pcapng-file $(PCAPNG) --dbc-file $(DBC)
-endif
 
 ##### TEST #####
 
@@ -100,7 +95,6 @@ test/coverage: ## Run tests with coverage ## make test/coverage
 clean/opendbc: ## Clean opendbc build files ## make clean/opendbc
 	@echo "Cleaning opendbc build files..."
 	uv run scons -C third_party/opendbc -c
-
 
 ##### HELP #####
 
