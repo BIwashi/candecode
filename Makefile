@@ -24,9 +24,9 @@ sync: ## Sync submodules to remote main branch ## make sync
 .PHONY: setup
 setup: ## Setup environment ## make setup
 	@echo "Setting up uv environment..."
-	git submodule update --init --recursive
-	uv sync
-	go mod tidy
+	@git submodule update --init --recursive
+	@uv sync
+	@go mod tidy
 
 ##### LINT #####
 
@@ -45,19 +45,26 @@ lint: ## Run all lint ## make lint
 OPENDBC_DIR 			:= third_party/opendbc
 OPENDBC_GENERATOR_DIR 	:= $(OPENDBC_DIR)/opendbc/dbc/generator
 OPENDBC_DBC_DIR 		:= $(OPENDBC_DIR)/opendbc/dbc
-OPENDBC_SOURCES 		:= $(shell find $(OPENDBC_GENERATOR_DIR) -name "*.py" -o -name "*.dbc" 2>/dev/null)
-OPENDBC_TARGETS 		:= $(OPENDBC_DBC_DIR)/.opendbc_built
+OPENDBC_SOURCES 		:= $(shell find $(OPENDBC_GENERATOR_DIR) -name "*.py" -o \( -name "*.dbc" -not -name "*_generated.dbc" \) 2>/dev/null)
+OPENDBC_STAMP 			:= $(BIN_DIR)/.opendbc_stamp
 # candecode build target with dependency tracking
 CANDECODE_SOURCES		:= $(shell find . -name "*.go" -not -path "./third_party/*" 2>/dev/null) go.mod go.sum
 CANDECODE_BINARY		:= $(BIN_DIR)/candecode
 # buf build target with dependency tracking
+BUF_PROTO_DIR			:= pkg/proto
+BUF_PROTO_SOURCES		:= $(shell find . -name "*.proto" 2>/dev/null) buf.gen.yaml buf.yaml
+BUF_TARGETS				:= $(BUF_PROTO_DIR)/*.pb.go
 
-$(OPENDBC_TARGETS): $(OPENDBC_SOURCES)
+$(BUF_TARGETS): $(BUF_PROTO_SOURCES) $(BUF)
+	@echo "Generating protobuf files..."
+	@$(BUF) generate
+
+$(OPENDBC_STAMP): $(OPENDBC_SOURCES)
 	@echo "Building opendbc files..."
 	uv run scons -C $(OPENDBC_DIR) -j8
-	@touch $(OPENDBC_TARGETS)
+	@touch $(OPENDBC_STAMP)
 
-$(CANDECODE_BINARY): $(CANDECODE_SOURCES)
+$(CANDECODE_BINARY): $(CANDECODE_SOURCES) $(BUF_TARGETS)
 	@echo "Building candecode binary..."
 	@mkdir -p $(BIN_DIR)
 	@go mod tidy
@@ -65,13 +72,10 @@ $(CANDECODE_BINARY): $(CANDECODE_SOURCES)
 	@echo "Binary built: $(CANDECODE_BINARY)"
 
 .PHONY: build/opendbc
-build/opendbc: setup $(OPENDBC_TARGETS) ## Build opendbc files ## make build/opendbc
+build/opendbc: setup $(OPENDBC_STAMP) ## Build opendbc files ## make build/opendbc
 
 .PHONY: build/buf
-build/buf: $(BUF)
-build/buf: ## Build buf ## make build/buf
-	@echo "Building buf..."
-	@$(BUF) generate
+build/buf: $(BUF_TARGETS) ## Build buf ## make build/buf
 
 .PHONY: build/cmd
 build/cmd: ## Build cmd ## make build/cmd
@@ -90,7 +94,7 @@ build: build/opendbc build/buf build/cmd ## Build all components ## make build
 
 .PHONY: run/convert
 run/convert: ## Convert PCAPNG to MCAP ## make run/convert PCAPNG=input.pcapng DBC=toyota.dbc
-run/convert: $(OPENDBC_TARGETS) $(CANDECODE_BINARY)
+run/convert: $(OPENDBC_TARGETS) $(CANDECODE_BINARY) $(OPENDBC_STAMP)
 run/convert: PCAPNG ?=
 run/convert: DBC ?=
 run/convert:
@@ -117,12 +121,11 @@ test/coverage: ## Run tests with coverage ## make test/coverage
 clean/opendbc: ## Clean opendbc build files ## make clean/opendbc
 	@echo "Cleaning opendbc build files..."
 	uv run scons -C third_party/opendbc -c
-	@rm -f $(OPENDBC_TARGETS)
 
 .PHONY: clean/bin
 clean/bin: ## Clean binary files ## make clean/bin
 	@echo "Cleaning binary files..."
-	rm -rf $(BIN_DIR)/
+	rm -rf $(BIN_DIR)/*
 
 .PHONY: clean
 clean: clean/opendbc clean/bin ## Clean all files ## make clean
