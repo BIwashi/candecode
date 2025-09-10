@@ -3,9 +3,8 @@
 OS   		:= $(shell uname | awk '{print tolower($$0)}')
 ARCH 		:= $(shell case $$(uname -m) in (x86_64) echo amd64 ;; (aarch64) echo arm64 ;; (*) echo $$(uname -m) ;; esac)
 BIN_DIR		:= ./bin
-BUF_VERSION	:= 1.32.2
+BUF_VERSION	:= 1.57.0
 BUF			:= $(abspath $(BIN_DIR)/buf)
-PROTOLINT_VERSION := 0.55.0
 
 ##### BINARY #####
 
@@ -32,11 +31,12 @@ setup: ## Setup environment ## make setup
 ##### LINT #####
 
 .PHONY: lint
-lint/: ## Run all lint ## make lint/all
+lint/: $(BUF)
+lint: ## Run all lint ## make lint
 	@echo "Running all lint..."
 	go fmt ./...
 	go tool strictgoimports -w -exclude "*.pb.go" -local "github.com/BIwashi/candecode" .
-	buf lint
+	$(BUF) lint
 
 ##### BUILD #####
 
@@ -97,6 +97,14 @@ test/coverage: ## Run tests with coverage ## make test/coverage
 clean/opendbc: ## Clean opendbc build files ## make clean/opendbc
 	@echo "Cleaning opendbc build files..."
 	uv run scons -C third_party/opendbc -c
+
+.PHONY: clean/bin
+clean/bin: ## Clean binary files ## make clean/bin
+	@echo "Cleaning binary files..."
+	rm -rf $(BIN_DIR)
+
+.PHONY: clean
+clean: clean/opendbc clean/bin ## Clean all files ## make clean
 
 ##### HELP #####
 
