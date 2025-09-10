@@ -90,19 +90,26 @@ func (s *converter) run(ctx context.Context, input cli.Input) error {
 	decoder := dbc.NewDecoder(compiler)
 
 	// Prepare MCAP output path: /mcap/<pcapng-basename-with-.mcap>
-	base := filepath.Base(s.pcapngFile)
-	baseNoExt := strings.TrimSuffix(base, filepath.Ext(base))
-	outDir := "mcap"
+	var (
+		base      = filepath.Base(s.pcapngFile)
+		baseNoExt = strings.TrimSuffix(base, filepath.Ext(base))
+		outDir    = "mcap"
+		mcapExt   = ".mcap"
+		outPath   = filepath.Join(outDir, baseNoExt+mcapExt)
+	)
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create mcap output dir: %w", err)
 	}
-	outPath := filepath.Join(outDir, baseNoExt+".mcap")
+
 	logger.Info("Opening MCAP output file...", "path", outPath)
+
 	mcapFile, err := os.Create(outPath)
 	if err != nil {
 		return fmt.Errorf("failed to create MCAP file: %w", err)
 	}
-	defer mcapFile.Close() //nolint:errcheck
+	defer func() {
+		_ = mcapFile.Close()
+	}()
 
 	mw, err := mcapwriter.NewWriter(mcapFile)
 	if err != nil {
