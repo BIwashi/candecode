@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package candecode.proto.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/BIwashi/candecode/pkg/proto;proto";
+
+message DecodedSignal {
+  string message_name = 1;
+  string name = 2;
+
+  oneof raw {
+    uint64 raw_u = 3;
+    sint64 raw_s = 4;
+    double raw_f = 5;
+    bool raw_b = 6;
+    bytes raw_bytes = 7;
+  }
+
+  optional double physical = 8;
+  string description = 9;
+  Signal signal = 10;
+  google.protobuf.Timestamp timestamp = 11;
+  uint32 can_id = 12;
+  bool is_extended = 13;
+  bytes frame_bytes = 14;
+}
+
+message Signal {
+  string name = 1;
+  uint32 start = 2;
+  uint32 length = 3;
+  bool is_big_endian = 4;
+  bool is_signed = 5;
+  bool is_float = 6;
+  bool is_multiplexer = 7;
+  bool is_multiplexed = 8;
+  uint32 multiplexer_value = 9;
+  double offset = 10;
+  double scale = 11;
+  double min = 12;
+  double max = 13;
+  string unit = 14;
+  string description = 15;
+  repeated ValueDescription value_descriptions = 16;
+  repeated string receiver_nodes = 17;
+  int32 default_value = 18;
+
+  string source_file = 19;
+}
+
+message ValueDescription {
+  int64 value = 1;
+  string description = 2;
+}
