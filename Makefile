@@ -40,11 +40,20 @@ lint: ## Run all lint ## make lint
 
 ##### BUILD #####
 
-.PHONY: build/opendbc
-build/opendbc: setup
-build/opendbc: ## Build opendbc files ## make build/opendbc
+# opendbc build target with dependency tracking
+OPENDBC_DIR 			:= third_party/opendbc
+OPENDBC_GENERATOR_DIR 	:= $(OPENDBC_DIR)/opendbc/dbc/generator
+OPENDBC_DBC_DIR 		:= $(OPENDBC_DIR)/opendbc/dbc
+OPENDBC_SOURCES 		:= $(shell find $(OPENDBC_GENERATOR_DIR) -name "*.py" -o -name "*.dbc" 2>/dev/null)
+OPENDBC_TARGETS 		:= $(OPENDBC_DBC_DIR)/.opendbc_built
+
+$(OPENDBC_TARGETS): $(OPENDBC_SOURCES)
 	@echo "Building opendbc files..."
-	uv run scons -C third_party/opendbc -j8
+	uv run scons -C $(OPENDBC_DIR) -j8
+	@touch $(OPENDBC_TARGETS)
+
+.PHONY: build/opendbc
+build/opendbc: setup $(OPENDBC_TARGETS) ## Build opendbc files ## make build/opendbc
 
 .PHONY: build/buf
 build/buf: $(BUF)
@@ -71,7 +80,7 @@ build: build/opendbc build/buf build/cmd ## Build all components ## make build
 
 .PHONY: run/convert
 run/convert: ## Convert PCAPNG to MCAP ## make run/convert PCAPNG=input.pcapng DBC=toyota.dbc
-run/convert: build
+run/convert: $(OPENDBC_TARGETS)
 run/convert: PCAPNG ?=
 run/convert: DBC ?=
 run/convert:
@@ -98,11 +107,12 @@ test/coverage: ## Run tests with coverage ## make test/coverage
 clean/opendbc: ## Clean opendbc build files ## make clean/opendbc
 	@echo "Cleaning opendbc build files..."
 	uv run scons -C third_party/opendbc -c
+	@rm -f $(OPENDBC_TARGETS)
 
 .PHONY: clean/bin
 clean/bin: ## Clean binary files ## make clean/bin
 	@echo "Cleaning binary files..."
-	rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR)/
 
 .PHONY: clean
 clean: clean/opendbc clean/bin ## Clean all files ## make clean
