@@ -31,6 +31,7 @@ type Writer struct {
 	schemaID   uint16
 	nextChanID uint16
 	channels   map[string]uint16 // key: canID_hex + ":" + signalName
+	channelSqc map[uint16]uint32 // key: channelID, value: sequence number
 }
 
 type WriterOption interface {
@@ -104,6 +105,7 @@ func NewWriter(out io.Writer, opts ...WriterOption) (*Writer, error) {
 		schemaID:   schemaID,
 		nextChanID: 1, // first channel will get ID=1
 		channels:   make(map[string]uint16),
+		channelSqc: make(map[uint16]uint32),
 	}, nil
 }
 
@@ -177,9 +179,12 @@ func (w *Writer) WriteDecodedSignal(ds *candecodeproto.DecodedSignal) error {
 		return errors.Wrap(err, "marshal DecodedSignal")
 	}
 
+	seq := w.channelSqc[channelID]
+	w.channelSqc[channelID]++
+
 	if err := w.writer.WriteMessage(&mcap.Message{
 		ChannelID:   channelID,
-		Sequence:    0,
+		Sequence:    seq,
 		LogTime:     uint64(ts.UnixNano()),
 		PublishTime: uint64(time.Now().UnixNano()),
 		Data:        data,
