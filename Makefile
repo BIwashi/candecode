@@ -35,6 +35,8 @@ setup: ## Setup environment ## make setup
 lint/: ## Run all lint ## make lint/all
 	@echo "Running all lint..."
 	go fmt ./...
+	go tool strictgoimports -w -local "github.com/BIwashi/candecode" .
+	buf lint
 
 ##### BUILD #####
 
