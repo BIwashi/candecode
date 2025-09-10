@@ -14,8 +14,8 @@ message DecodedSignal {
     uint64 raw_u = 3;
     sint64 raw_s = 4;
     double raw_f = 5;
-    bool   raw_b = 6;
-    bytes  raw_bytes = 7;
+    bool raw_b = 6;
+    bytes raw_bytes = 7;
   }
 
   optional double physical = 8;

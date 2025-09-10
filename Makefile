@@ -71,8 +71,8 @@ build: build/opendbc build/buf build/cmd ## Build all components ## make build
 
 .PHONY: run/convert
 run/convert: build ## Convert PCAPNG to MCAP ## make run/convert PCAPNG=input.pcapng DBC=toyota.dbc
-run/convert: PCAPNG ?= pcapng/can_00001_20250908185300.pcapng
-run/convert: DBC ?= third_party/opendbc/opendbc/dbc/toyota_new_mc_pt_generated.dbc
+run/convert: PCAPNG ?=
+run/convert: DBC ?=
 run/convert:
 	@echo "Converting PCAPNG to MCAP..."
 	@$(BIN_DIR)/candecode convert --pcapng-file $(PCAPNG) --dbc-file $(DBC)
