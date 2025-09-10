@@ -70,7 +70,8 @@ build: build/opendbc build/buf build/cmd ## Build all components ## make build
 ##### RUN #####
 
 .PHONY: run/convert
-run/convert: build ## Convert PCAPNG to MCAP ## make run/convert PCAPNG=input.pcapng DBC=toyota.dbc
+run/convert: ## Convert PCAPNG to MCAP ## make run/convert PCAPNG=input.pcapng DBC=toyota.dbc
+run/convert: build
 run/convert: PCAPNG ?=
 run/convert: DBC ?=
 run/convert:

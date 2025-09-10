@@ -39,7 +39,7 @@ This command reads CAN frames from a PCAPNG file, decodes them using a DBC file,
 and writes the decoded messages to an MCAP file with protobuf schema.`,
 		Example: `
 # Convert PCAPNG to MCAP
-candecode convert --dbc-file toyota.dbc --pcapng-file capture.pcapng --mcap-file output.mcap`,
+candecode convert --dbc-file reference.dbc --pcapng-file capture.pcapng --mcap-file output.mcap`,
 		RunE: cli.WithContext(s.run),
 	}
 
