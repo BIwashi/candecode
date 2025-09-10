@@ -49,6 +49,7 @@ OPENDBC_DBC_DIR 		:= $(OPENDBC_DIR)/opendbc/dbc
 OPENDBC_SOURCES 		:= $(shell find $(OPENDBC_GENERATOR_DIR) -name "*.py" -o \( -name "*.dbc" -not -name "*_generated.dbc" \) 2>/dev/null)
 OPENDBC_STAMP 			:= $(BIN_DIR)/.opendbc_stamp
 # candecode build target with dependency tracking
+CANDECODE_MAIN			:= ./cmd/candecode/main.go
 CANDECODE_SOURCES		:= $(shell find . -name "*.go" -not -path "$(OPENDBC_DIR)/*" 2>/dev/null) go.mod go.sum
 CANDECODE_BINARY		:= $(BIN_DIR)/candecode
 # buf build target with dependency tracking
@@ -69,7 +70,7 @@ $(CANDECODE_BINARY): $(CANDECODE_SOURCES) $(BUF_TARGETS)
 	@echo "Building candecode binary..."
 	@mkdir -p $(BIN_DIR)
 	@go mod tidy
-	@$(BUILD_ENV) go build $(BUILD_OPTS) -o $(CANDECODE_BINARY) ./cmd/main.go
+	@$(BUILD_ENV) go build $(BUILD_OPTS) -o $(CANDECODE_BINARY) $(CANDECODE_MAIN)
 	@echo "Binary built: $(CANDECODE_BINARY)"
 
 .PHONY: build/opendbc
