@@ -6,12 +6,13 @@ import (
 	"sync"
 	"time"
 
-	candecodeproto "github.com/BIwashi/candecode/pkg/proto"
 	"github.com/foxglove/mcap/go/mcap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/types/descriptorpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+
+	candecodeproto "github.com/BIwashi/candecode/pkg/proto"
 )
 
 // Writer writes DecodedSignal proto messages into an MCAP file.

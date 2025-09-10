@@ -7,14 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cockroachdb/errors"
+	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/BIwashi/candecode/pkg/cli"
 	"github.com/BIwashi/candecode/pkg/dbc"
 	mcapwriter "github.com/BIwashi/candecode/pkg/mcap"
 	"github.com/BIwashi/candecode/pkg/pcapng"
 	candecodeproto "github.com/BIwashi/candecode/pkg/proto"
-	"github.com/cockroachdb/errors"
-	"github.com/spf13/cobra"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type converter struct {

@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/BIwashi/candecode/pkg/can"
 	"github.com/cockroachdb/errors"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcapgo"
 	ecan "go.einride.tech/can"
+
+	"github.com/BIwashi/candecode/pkg/can"
 )
 
 // Reader reads CAN frames from PCAPNG file

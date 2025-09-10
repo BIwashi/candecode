@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/BIwashi/candecode/pkg/can"
 	"github.com/cockroachdb/errors"
 	"go.einride.tech/can/pkg/descriptor"
+
+	"github.com/BIwashi/candecode/pkg/can"
 )
 
 type DecodedSignal struct {
